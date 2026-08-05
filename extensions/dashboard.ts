@@ -18,25 +18,28 @@ import { execSync } from "node:child_process";
 import { statSync } from "node:fs";
 import { basename } from "node:path";
 import {
-  decodePrintableKey,
-  matchesKey,
-  truncateToWidth,
-  visibleWidth,
+	decodePrintableKey,
+	matchesKey,
+	truncateToWidth,
+	visibleWidth,
 } from "@earendil-works/pi-tui";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type {
+	ExtensionAPI,
+	ExtensionContext,
+} from "@earendil-works/pi-coding-agent";
 import type { Component } from "@earendil-works/pi-tui";
 
 // The pi "P" logo (recovered from the pre-restructure dashboard).
 const LOGO = [
-  "████████████",
-  "████████████",
-  "████    ████",
-  "████    ████",
-  "████████    ████",
-  "████████    ████",
-  "████        ████",
-  "████        ████",
+	"████████████",
+	"████████████",
+	"████    ████",
+	"████    ████",
+	"████████    ████",
+	"████████    ████",
+	"████        ████",
+	"████        ████",
 ];
 
 // Nerd Font icons (no emoji).
@@ -47,374 +50,419 @@ const ICON_BRANCH = "\uE0A0"; // nf-dev-git_branch
 /** Clear screen + home. Used on mount and just before shutdown. */
 const CLEAR = "\x1b[2J\x1b[H";
 
+/** Max width of the centered content column; wider terminals get margins. */
+const MAX_CONTENT_WIDTH = 72;
+
 const OVERLAY_OPTIONS = {
-  overlay: true,
-  overlayOptions: { anchor: "top-left", margin: 0, width: "100%", height: "100%" },
+	overlay: true,
+	overlayOptions: {
+		anchor: "top-left",
+		margin: 0,
+		width: "100%",
+		height: "100%",
+	},
 } as const;
 
 interface SessionEntry {
-  file: string;
-  path?: string;
-  name?: string;
-  displayName?: string;
-  firstMessage?: string;
+	file: string;
+	path?: string;
+	name?: string;
+	displayName?: string;
+	firstMessage?: string;
 }
 
 type DashboardChoice =
-  | { type: "resume"; file: string }
-  | { type: "new" }
-  | { type: "quit" };
+	| { type: "resume"; file: string }
+	| { type: "new" }
+	| { type: "quit" };
 
 interface MinimalTui {
-  terminal: { rows: number; columns: number; write(data: string): void };
-  requestRender(): void;
+	terminal: { rows: number; columns: number; write(data: string): void };
+	requestRender(): void;
 }
 
 type ThemeFn = (color: string, text: string) => string;
 
 function sessionFile(session: SessionEntry): string {
-  return session.file ?? session.path ?? "";
+	return session.file ?? session.path ?? "";
 }
 
 function sessionLabel(session: SessionEntry): string {
-  const raw =
-    session.displayName ?? session.name ?? session.firstMessage ?? basename(sessionFile(session));
-  const firstLine = raw.split("\n")[0] ?? "";
-  return firstLine.length > 44 ? `${firstLine.slice(0, 41)}...` : firstLine;
+	const raw =
+		session.displayName ??
+		session.name ??
+		session.firstMessage ??
+		basename(sessionFile(session));
+	const firstLine = raw.split("\n")[0] ?? "";
+	return firstLine.length > 44 ? `${firstLine.slice(0, 41)}...` : firstLine;
 }
 
 function formatRelativeTime(mtimeMs: number): string {
-  const diffMs = Date.now() - mtimeMs;
-  const s = Math.floor(diffMs / 1000);
-  if (s < 60) return "now";
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  if (d < 7) return `${d}d ago`;
-  return new Date(mtimeMs).toISOString().slice(0, 10);
+	const diffMs = Date.now() - mtimeMs;
+	const s = Math.floor(diffMs / 1000);
+	if (s < 60) return "now";
+	const m = Math.floor(s / 60);
+	if (m < 60) return `${m}m ago`;
+	const h = Math.floor(m / 60);
+	if (h < 24) return `${h}h ago`;
+	const d = Math.floor(h / 24);
+	if (d < 7) return `${d}d ago`;
+	return new Date(mtimeMs).toISOString().slice(0, 10);
 }
 
 function getGitBranch(): string {
-  try {
-    return execSync("git rev-parse --abbrev-ref HEAD", { encoding: "utf8" })
-      .trim()
-      .replace(/^detached at /, "detached");
-  } catch {
-    return "";
-  }
+	try {
+		return execSync("git rev-parse --abbrev-ref HEAD", { encoding: "utf8" })
+			.trim()
+			.replace(/^detached at /, "detached");
+	} catch {
+		return "";
+	}
 }
 
 function getCwdDisplay(): string {
-  const cwd = process.cwd();
-  const home = process.env.HOME ?? "";
-  return cwd.startsWith(home) ? `~${cwd.slice(home.length)}` : cwd;
+	const cwd = process.cwd();
+	const home = process.env.HOME ?? "";
+	return cwd.startsWith(home) ? `~${cwd.slice(home.length)}` : cwd;
 }
 
 function getPiVersion(pi: ExtensionAPI): string {
-  const withVersion = pi as ExtensionAPI & { getVersion?: () => string };
-  try {
-    return withVersion.getVersion?.() ?? "";
-  } catch {
-    return "";
-  }
+	const withVersion = pi as ExtensionAPI & { getVersion?: () => string };
+	try {
+		return withVersion.getVersion?.() ?? "";
+	} catch {
+		return "";
+	}
 }
 
 class DashboardComponent implements Component {
-  private selectedIndex = 0;
-  private filter = "";
-  private filtering = false;
+	private selectedIndex = 0;
+	private filter = "";
+	private filtering = false;
 
-  constructor(
-    private tui: MinimalTui,
-    private sessions: SessionEntry[],
-    private theme: { fg: ThemeFn },
-    private done: (choice: DashboardChoice) => void,
-  ) {}
+	constructor(
+		private tui: MinimalTui,
+		private sessions: SessionEntry[],
+		private theme: { fg: ThemeFn },
+		private done: (choice: DashboardChoice) => void,
+	) {}
 
-  private filtered(): SessionEntry[] {
-    if (this.filter === "") {
-      return this.sessions;
-    }
-    const needle = this.filter.toLowerCase();
-    return this.sessions.filter((s) => sessionLabel(s).toLowerCase().includes(needle));
-  }
+	private filtered(): SessionEntry[] {
+		if (this.filter === "") {
+			return this.sessions;
+		}
+		const needle = this.filter.toLowerCase();
+		return this.sessions.filter((s) =>
+			sessionLabel(s).toLowerCase().includes(needle),
+		);
+	}
 
-  private snap(): void {
-    const len = this.filtered().length;
-    this.selectedIndex = Math.max(0, Math.min(this.selectedIndex, Math.max(0, len - 1)));
-  }
+	private snap(): void {
+		const len = this.filtered().length;
+		this.selectedIndex = Math.max(
+			0,
+			Math.min(this.selectedIndex, Math.max(0, len - 1)),
+		);
+	}
 
-  private move(dir: number): void {
-    this.snap();
-    const len = this.filtered().length;
-    if (len === 0) return;
-    this.selectedIndex = Math.max(0, Math.min(this.selectedIndex + dir, len - 1));
-    this.tui.requestRender();
-  }
+	private move(dir: number): void {
+		this.snap();
+		const len = this.filtered().length;
+		if (len === 0) return;
+		this.selectedIndex = Math.max(
+			0,
+			Math.min(this.selectedIndex + dir, len - 1),
+		);
+		this.tui.requestRender();
+	}
 
-  private launchSelected(): void {
-    const list = this.filtered();
-    if (list.length === 0) return;
-    this.snap();
-    const file = sessionFile(list[this.selectedIndex]);
-    if (file !== "") {
-      this.done({ type: "resume", file });
-    }
-  }
+	private launchSelected(): void {
+		const list = this.filtered();
+		if (list.length === 0) return;
+		this.snap();
+		const file = sessionFile(list[this.selectedIndex]);
+		if (file !== "") {
+			this.done({ type: "resume", file });
+		}
+	}
 
-  handleInput(data: string): void {
-    if (this.filtering && this.handleFilterInput(data)) {
-      return;
-    }
-    this.handleNavInput(data);
-  }
+	handleInput(data: string): void {
+		if (this.filtering && this.handleFilterInput(data)) {
+			return;
+		}
+		this.handleNavInput(data);
+	}
 
-  private handleFilterInput(data: string): boolean {
-    if (matchesKey(data, "escape") || matchesKey(data, "tab")) {
-      this.filtering = false;
-      this.filter = "";
-      this.snap();
-      this.tui.requestRender();
-      return true;
-    }
-    if (matchesKey(data, "backspace")) {
-      this.filter = this.filter.slice(0, -1);
-      this.snap();
-      this.tui.requestRender();
-      return true;
-    }
-    if (matchesKey(data, "enter")) {
-      this.launchSelected();
-      return true;
-    }
-    const ch = decodePrintableKey(data);
-    if (ch !== undefined) {
-      this.filter += ch;
-      this.snap();
-      this.tui.requestRender();
-      return true;
-    }
-    return false;
-  }
+	private handleFilterInput(data: string): boolean {
+		if (matchesKey(data, "escape") || matchesKey(data, "tab")) {
+			this.filtering = false;
+			this.filter = "";
+			this.snap();
+			this.tui.requestRender();
+			return true;
+		}
+		if (matchesKey(data, "backspace")) {
+			this.filter = this.filter.slice(0, -1);
+			this.snap();
+			this.tui.requestRender();
+			return true;
+		}
+		if (matchesKey(data, "enter")) {
+			this.launchSelected();
+			return true;
+		}
+		const ch = decodePrintableKey(data);
+		if (ch !== undefined) {
+			this.filter += ch;
+			this.snap();
+			this.tui.requestRender();
+			return true;
+		}
+		return false;
+	}
 
-  private handleNavInput(data: string): void {
-    if (matchesKey(data, "j") || matchesKey(data, "down")) {
-      this.move(1);
-      return;
-    }
-    if (matchesKey(data, "k") || matchesKey(data, "up")) {
-      this.move(-1);
-      return;
-    }
-    if (matchesKey(data, "enter")) {
-      this.launchSelected();
-      return;
-    }
-    if (matchesKey(data, "n")) {
-      this.done({ type: "new" });
-      return;
-    }
-    if (matchesKey(data, "q") || matchesKey(data, "escape")) {
-      this.done({ type: "quit" });
-      return;
-    }
-    if (matchesKey(data, "tab")) {
-      this.filtering = true;
-      this.tui.requestRender();
-    }
-  }
+	private handleNavInput(data: string): void {
+		if (matchesKey(data, "j") || matchesKey(data, "down")) {
+			this.move(1);
+			return;
+		}
+		if (matchesKey(data, "k") || matchesKey(data, "up")) {
+			this.move(-1);
+			return;
+		}
+		if (matchesKey(data, "enter")) {
+			this.launchSelected();
+			return;
+		}
+		if (matchesKey(data, "n")) {
+			this.done({ type: "new" });
+			return;
+		}
+		if (matchesKey(data, "q") || matchesKey(data, "escape")) {
+			this.done({ type: "quit" });
+			return;
+		}
+		if (matchesKey(data, "tab")) {
+			this.filtering = true;
+			this.tui.requestRender();
+		}
+	}
 
-  invalidate(): void {}
+	invalidate(): void {}
 
-  render(width: number): string[] {
-    const rows = Math.max(10, this.tui.terminal.rows || 24);
+	render(width: number): string[] {
+		const rows = Math.max(10, this.tui.terminal.rows || 24);
+		const contentWidth = Math.min(width, MAX_CONTENT_WIDTH);
 
-    const list = this.filtered();
-    this.snap();
+		const list = this.filtered();
+		this.snap();
 
-    const sessionLines = this.buildSessionLines(list, width);
-    const statusLine = this.buildStatusLine();
-    const hintLine = this.filtering
-      ? `search: ${this.theme.fg("accent", `${this.filter}\u2588`)}`
-      : "j/k scroll · enter continue · n new · tab search · q/esc quit";
+		const sessionLines = this.buildSessionLines(list, contentWidth);
+		const statusLine = this.buildStatusLine();
+		const hintLine = this.filtering
+			? `search: ${this.theme.fg("accent", `${this.filter}\u2588`)}`
+			: "j/k scroll · enter continue · n new · tab search · q/esc quit";
 
-    const version = getPiVersionForLine();
-    const logoLines = LOGO.map((l) => this.theme.fg("accent", l));
-    const versionLine = version === "" ? null : this.theme.fg("muted", `pi  ${version}`);
+		const version = getPiVersionForLine();
+		const logoLines = LOGO.map((l) => {
+			const logoWidth = visibleWidth(l);
+			const pad = Math.max(0, Math.floor((contentWidth - logoWidth) / 2));
+			return this.theme.fg("accent", " ".repeat(pad) + l);
+		});
+		const versionLine =
+			version === "" ? null : this.theme.fg("muted", `pi  ${version}`);
 
-    const blocks: string[][] = [];
-    blocks.push(logoLines);
-    if (versionLine !== null) {
-      blocks.push([versionLine]);
-    }
-    blocks.push([""]);
-    blocks.push(sessionLines);
-    blocks.push([""]);
-    blocks.push([this.theme.fg("muted", hintLine)]);
-    blocks.push([this.theme.fg("dim", statusLine)]);
+		const blocks: string[][] = [];
+		blocks.push(logoLines);
+		if (versionLine !== null) {
+			blocks.push([versionLine]);
+		}
+		blocks.push([""]);
+		blocks.push(sessionLines);
+		blocks.push([""]);
+		blocks.push([this.theme.fg("muted", hintLine)]);
+		blocks.push([this.theme.fg("dim", statusLine)]);
 
-    const totalHeight = blocks.reduce((sum, b) => sum + b.length, 0);
-    const topPad = Math.max(0, Math.floor((rows - totalHeight) / 2));
+		const totalHeight = blocks.reduce((sum, b) => sum + b.length, 0);
+		const topPad = Math.max(0, Math.floor((rows - totalHeight) / 2));
+		const offset = Math.max(0, Math.floor((width - contentWidth) / 2));
 
-    const out: string[] = [];
-    for (let i = 0; i < topPad; i += 1) {
-      out.push(" ".repeat(width));
-    }
-    for (const block of blocks) {
-      const blockWidth = Math.max(...block.map((l) => visibleWidth(l)), 0);
-      const offset = Math.max(0, Math.floor((width - blockWidth) / 2));
-      for (const line of block) {
-        out.push(truncateToWidth(" ".repeat(offset) + line, width, ""));
-      }
-    }
-    while (out.length < rows) {
-      out.push(" ".repeat(width));
-    }
-    return out;
-  }
+		const out: string[] = [];
+		for (let i = 0; i < topPad; i += 1) {
+			out.push(" ".repeat(width));
+		}
+		for (const block of blocks) {
+			for (const line of block) {
+				out.push(truncateToWidth(" ".repeat(offset) + line, width, ""));
+			}
+		}
+		while (out.length < rows) {
+			out.push(" ".repeat(width));
+		}
+		return out;
+	}
 
-  private buildSessionLines(list: SessionEntry[], width: number): string[] {
-    if (list.length === 0) {
-      const msg =
-        this.filter !== ""
-          ? `No sessions match "${this.filter}"`
-          : "No sessions yet — press n to start one";
-      return [this.theme.fg("dim", `${ICON_CLOCK} Recent sessions`), this.theme.fg("muted", msg)];
-    }
+	private buildSessionLines(list: SessionEntry[], width: number): string[] {
+		if (list.length === 0) {
+			const msg =
+				this.filter !== ""
+					? `No sessions match "${this.filter}"`
+					: "No sessions yet — press n to start one";
+			return [
+				this.theme.fg("dim", `${ICON_CLOCK} Recent sessions`),
+				this.theme.fg("muted", msg),
+			];
+		}
 
-    // Available rows for the list, accounting for header + the rows below.
-    const maxList = Math.max(1, Math.min(8, (this.tui.terminal.rows || 24) - 18));
-    const len = list.length;
-    const half = Math.floor(maxList / 2);
-    const start = Math.max(0, Math.min(this.selectedIndex - half, len - maxList));
+		// Available rows for the list, accounting for header + the rows below.
+		const maxList = Math.max(
+			1,
+			Math.min(8, (this.tui.terminal.rows || 24) - 18),
+		);
+		const len = list.length;
+		const half = Math.floor(maxList / 2);
+		const start = Math.max(
+			0,
+			Math.min(this.selectedIndex - half, len - maxList),
+		);
 
-    const lines: string[] = [];
-    const headerCount = len > 1 ? `  (${len})` : "";
-    lines.push(this.theme.fg("dim", `${ICON_CLOCK} Recent sessions${headerCount}`));
-    lines.push("");
+		const lines: string[] = [];
+		const headerCount = len > 1 ? `  (${len})` : "";
+		lines.push(
+			this.theme.fg("dim", `${ICON_CLOCK} Recent sessions${headerCount}`),
+		);
+		lines.push("");
 
-    for (let i = start; i < start + maxList && i < len; i += 1) {
-      const session = list[i];
-      const selected = i === this.selectedIndex;
-      const label = sessionLabel(session);
-      const time = formatRelativeTime(safeMtime(sessionFile(session)));
-      const marker = selected ? "▸ " : "  ";
-      const name = selected ? this.theme.fg("accent", `${marker}${label}`) : `${marker}${label}`;
-      const gap = Math.max(1, width - visibleWidth(name) - visibleWidth(time) - 2);
-      const line = selected
-        ? `${name}${" ".repeat(gap)}${this.theme.fg("dim", time)}`
-        : `${name}${" ".repeat(gap)}${this.theme.fg("dim", time)}`;
-      lines.push(truncateToWidth(line, width, ""));
-    }
-    if (len > maxList) {
-      lines.push(this.theme.fg("muted", `  ${this.selectedIndex + 1}/${len} sessions`));
-    }
-    lines.push("");
-    lines.push(
-      `${this.theme.fg("accent", `${ICON_NEW} New session`)}${" ".repeat(Math.max(2, 4))}${this.theme.fg("muted", "n")}`,
-    );
-    return lines;
-  }
+		for (let i = start; i < start + maxList && i < len; i += 1) {
+			const session = list[i];
+			const selected = i === this.selectedIndex;
+			const label = sessionLabel(session);
+			const time = formatRelativeTime(safeMtime(sessionFile(session)));
+			const marker = selected ? "▸ " : "  ";
+			const name = selected
+				? this.theme.fg("accent", `${marker}${label}`)
+				: `${marker}${label}`;
+			const gap = Math.max(
+				1,
+				width - visibleWidth(name) - visibleWidth(time) - 2,
+			);
+			const line = selected
+				? `${name}${" ".repeat(gap)}${this.theme.fg("dim", time)}`
+				: `${name}${" ".repeat(gap)}${this.theme.fg("dim", time)}`;
+			lines.push(truncateToWidth(line, width, ""));
+		}
+		if (len > maxList) {
+			lines.push(
+				this.theme.fg("muted", `  ${this.selectedIndex + 1}/${len} sessions`),
+			);
+		}
+		lines.push("");
+		lines.push(
+			`${this.theme.fg("accent", `${ICON_NEW} New session`)}${" ".repeat(Math.max(2, 4))}${this.theme.fg("muted", "n")}`,
+		);
+		return lines;
+	}
 
-  private buildStatusLine(): string {
-    const parts: string[] = [getCwdDisplay()];
-    const branch = getGitBranch();
-    if (branch !== "") {
-      parts.push(`${ICON_BRANCH} ${branch}`);
-    }
-    const modelId = activeModelId();
-    if (modelId !== "") {
-      parts.push(modelId);
-    }
-    return this.theme.fg("dim", parts.join(" · "));
-  }
+	private buildStatusLine(): string {
+		const parts: string[] = [getCwdDisplay()];
+		const branch = getGitBranch();
+		if (branch !== "") {
+			parts.push(`${ICON_BRANCH} ${branch}`);
+		}
+		const modelId = activeModelId();
+		if (modelId !== "") {
+			parts.push(modelId);
+		}
+		return this.theme.fg("dim", parts.join(" · "));
+	}
 }
 
 let cachedVersion: string | null = null;
 
 function getPiVersionForLine(): string {
-  return cachedVersion ?? "";
+	return cachedVersion ?? "";
 }
 
 function safeMtime(file: string): number {
-  try {
-    return statSync(file).mtimeMs;
-  } catch {
-    return 0;
-  }
+	try {
+		return statSync(file).mtimeMs;
+	} catch {
+		return 0;
+	}
 }
 
 let modelForStatus = "";
 
 function activeModelId(): string {
-  return modelForStatus;
+	return modelForStatus;
 }
 
 export default function (pi: ExtensionAPI) {
-  cachedVersion = getPiVersion(pi);
-  let activeTui: MinimalTui | undefined;
+	cachedVersion = getPiVersion(pi);
+	let activeTui: MinimalTui | undefined;
 
-  async function showDashboard(ctx: ExtensionContext): Promise<void> {
-    const sessions = (await SessionManager.list(ctx.cwd)) as unknown as SessionEntry[];
-    modelForStatus = readModelId(ctx);
+	async function showDashboard(ctx: ExtensionContext): Promise<void> {
+		const sessions = (await SessionManager.list(
+			ctx.cwd,
+		)) as unknown as SessionEntry[];
+		modelForStatus = readModelId(ctx);
 
-    const result = await ctx.ui.custom<DashboardChoice>((tui, theme, _keybindings, done) => {
-      activeTui = tui;
-      try {
-        tui.terminal.write(CLEAR);
-      } catch {
-        // Clearing is best-effort.
-      }
-      return new DashboardComponent(
-        tui,
-        sessions,
-        theme,
-        done,
-      );
-    }, OVERLAY_OPTIONS);
+		const result = await ctx.ui.custom<DashboardChoice>(
+			(tui, theme, _keybindings, done) => {
+				activeTui = tui;
+				try {
+					tui.terminal.write(CLEAR);
+				} catch {
+					// Clearing is best-effort.
+				}
+				return new DashboardComponent(tui, sessions, theme, done);
+			},
+			OVERLAY_OPTIONS,
+		);
 
-    if (result?.type === "resume" && result.file !== "") {
-      await ctx.switchSession(result.file);
-    } else if (result?.type === "new") {
-      await ctx.newSession();
-    } else if (result?.type === "quit") {
-      try {
-        activeTui?.terminal.write(CLEAR);
-      } catch {
-        // Best-effort.
-      }
-      ctx.shutdown();
-    }
-  }
+		if (result?.type === "resume" && result.file !== "") {
+			ctx.sessionManager.setSessionFile(result.file);
+		} else if (result?.type === "new") {
+			ctx.sessionManager.newSession();
+		} else if (result?.type === "quit") {
+			try {
+				activeTui?.terminal.write(CLEAR);
+			} catch {
+				// Best-effort.
+			}
+			ctx.shutdown();
+		}
+	}
 
-  pi.on("session_start", async (event, ctx) => {
-    if (event.reason !== "startup" || ctx.mode !== "tui") {
-      return;
-    }
-    await showDashboard(ctx);
-  });
+	pi.on("session_start", async (event, ctx) => {
+		if (event.reason !== "startup" || ctx.mode !== "tui") {
+			return;
+		}
+		await showDashboard(ctx);
+	});
 
-  pi.registerCommand("dashboard", {
-    description: "Open the dashboard launcher",
-    handler: async (_args: string[], ctx: ExtensionContext) => {
-      if (ctx.mode !== "tui") {
-        ctx.ui.notify("Dashboard requires interactive mode", "error");
-        return;
-      }
-      await showDashboard(ctx);
-    },
-  });
+	pi.registerCommand("dashboard", {
+		description: "Open the dashboard launcher",
+		handler: async (_args: string[], ctx: ExtensionContext) => {
+			if (ctx.mode !== "tui") {
+				ctx.ui.notify("Dashboard requires interactive mode", "error");
+				return;
+			}
+			await showDashboard(ctx);
+		},
+	});
 }
 
 function readModelId(ctx: ExtensionContext): string {
-  const model = ctx.model as { id?: string; provider?: string } | string | undefined;
-  if (typeof model === "string") {
-    return model;
-  }
-  if (model?.id) {
-    return model.provider ? `${model.provider}/${model.id}` : model.id;
-  }
-  return "";
+	const model = ctx.model as
+		| { id?: string; provider?: string }
+		| string
+		| undefined;
+	if (typeof model === "string") {
+		return model;
+	}
+	if (model?.id) {
+		return model.provider ? `${model.provider}/${model.id}` : model.id;
+	}
+	return "";
 }

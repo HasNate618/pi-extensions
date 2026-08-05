@@ -1,0 +1,19 @@
+{
+  "name": "pi-extensions",
+  "version": "0.1.0",
+  "description": "Nate's pi coding agent setup: trawl-backed researcher, writing-plans planner, clean TUI footer",
+  "keywords": ["pi-package"],
+  "license": "MIT",
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-agent-core": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
+  },
+  "pi": {
+    "extensions": ["./extensions"],
+    "subagents": {
+      "agents": ["./agents"]
+    }
+  }
+}

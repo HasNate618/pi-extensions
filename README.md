@@ -7,6 +7,7 @@ Provides:
 - **`researcher`** — web-research subagent backed by the [trawl](https://trawl.home.lab/mcp) MCP search server (via the `mcp` proxy tool; no direct-tools dependency)
 - **`planner`** — implementation-planning subagent wired to the `superpowers:writing-plans` skill
 - **`prefix-keys`** — tmux-style prefix/leader keybindings for the TUI (see below)
+- **`dashboard`** — full-screen launcher at startup: logo, recent-session picker, new session, quit (see below)
 
 ## Install
 
@@ -17,6 +18,20 @@ pi install npm:pi-subagents         # subagent runtime
 ```
 
 Restart pi (or `/reload`).
+
+## dashboard (startup launcher)
+
+Replaces pi's startup screen with a centered launcher: the pi logo, recent sessions, quick actions, and a status line. Terminal pane is cleared on open and on quit.
+
+| Key | Action |
+|---|---|
+| `j`/`k` (or arrows) | scroll sessions |
+| `enter` | open selected (default: most recent) |
+| `n` | new session |
+| `tab` | filter/search sessions |
+| `q`/`esc` | quit pi |
+
+Reopen anytime with `/dashboard`.
 
 ## prefix-keys (prefix keybindings)
 

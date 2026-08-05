@@ -29,7 +29,7 @@ Press a configurable prefix (default `ctrl+x`) then a mapped key to run an actio
 #   ctrl+x r → /resume     ctrl+x z → /zentui     ctrl+x c → /copy
 ```
 
-Targets: `command:/name` runs a slash command; `key:ctrl+l` injects a keybinding chord (ctrl+letter, plain keys, `shift+tab`, and common specials).
+Targets: `command:/name` runs a slash command through the editor's submit path (the same mechanism as typing `/name` + enter — the only public command-dispatch route pi exposes); `key:ctrl+l` injects a keybinding chord (ctrl+letter, plain keys, `shift+tab`, and common specials).
 
 On session start the extension warns about any built-in action your prefix overrides (e.g. `ctrl+x` is `app.message.copy` / `app.models.clearAll` by default) — change the `prefix` in the config if you want those keys back. `escape` cancels an armed prefix; it auto-disarms after `timeoutMs`. Status/`/prefix-keys` command shows the active config.
 

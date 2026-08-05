@@ -6,7 +6,7 @@ Provides:
 
 - **`researcher`** — web-research subagent backed by the [trawl](https://trawl.home.lab/mcp) MCP search server (via the `mcp` proxy tool; no direct-tools dependency)
 - **`planner`** — implementation-planning subagent wired to the `superpowers:writing-plans` skill
-- **`clean-footer`** — custom TUI footer: usage line (`↑ ↓ R CH $ ctx%`) only, hides extension status noise like `LSP Inactive`
+- **`prefix-keys`** — tmux-style prefix/leader keybindings for the TUI (see below)
 
 ## Install
 
@@ -17,6 +17,23 @@ pi install npm:pi-subagents         # subagent runtime
 ```
 
 Restart pi (or `/reload`).
+
+## prefix-keys (prefix keybindings)
+
+Press a configurable prefix (default `ctrl+x`) then a mapped key to run an action — tmux-style. While armed, a `prefix ⌗` chip shows in the footer; the key you then press is consumed and never reaches the editor.
+
+```bash
+# default bindings (config: ~/.pi/agent/prefix-keys.json)
+#   ctrl+x m → /model      ctrl+x t → /tree       ctrl+x T → thinking cycle
+#   ctrl+x n → /new        ctrl+x f → /fork       ctrl+x o → /compact
+#   ctrl+x r → /resume     ctrl+x z → /zentui     ctrl+x c → /copy
+```
+
+Targets: `command:/name` runs a slash command; `key:ctrl+l` injects a keybinding chord (ctrl+letter, plain keys, `shift+tab`, and common specials).
+
+On session start the extension warns about any built-in action your prefix overrides (e.g. `ctrl+x` is `app.message.copy` / `app.models.clearAll` by default) — change the `prefix` in the config if you want those keys back. `escape` cancels an armed prefix; it auto-disarms after `timeoutMs`. Status/`/prefix-keys` command shows the active config.
+
+Self-test (no TUI needed): `PREFIX_KEYS_SELFTEST=1 pi -p --no-session "Say OK."`
 
 ## Upstream packages used
 

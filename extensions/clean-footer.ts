@@ -6,76 +6,116 @@
  * - Right side: model id + git branch
  * - No extension statuses (setStatus texts) are rendered.
  *
- * Drop this file from ~/.pi/agent/extensions/ to restore the default footer.
+ * Drop this file from the package (or uninstall it) to restore the default footer.
  */
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
+interface UsageTotals {
+	input: number;
+	output: number;
+	cacheRead: number;
+	cacheWrite: number;
+	cost: number;
+	latestCh: number | null;
+}
+
+function num(v: number | undefined): number {
+	return typeof v === "number" ? v : 0;
+}
+
+function computeUsage(entries: unknown[]): UsageTotals {
+	let input = 0,
+		output = 0,
+		cacheRead = 0,
+		cacheWrite = 0,
+		cost = 0;
+	let latestCh: number | null = null;
+
+	for (let i = entries.length - 1; i >= 0; i--) {
+		const entry = entries[i] as {
+			type?: string;
+			message?: { role?: string; usage?: AssistantMessage["usage"] };
+		};
+		if (entry?.type !== "message" || entry.message?.role !== "assistant")
+			continue;
+		const usage = entry.message.usage;
+		if (!usage) continue;
+		input += num(usage.input);
+		output += num(usage.output);
+		cacheRead += num(usage.cacheRead);
+		cacheWrite += num(usage.cacheWrite);
+		cost += num(usage.cost?.total);
+		// CH is computed from the latest assistant prompt only.
+		const denom =
+			num(usage.input) + num(usage.cacheRead) + num(usage.cacheWrite);
+		if (latestCh === null && denom > 0) {
+			latestCh = (num(usage.cacheRead) / denom) * 100;
+		}
+	}
+
+	return { input, output, cacheRead, cacheWrite, cost, latestCh };
+}
+
+function formatTokens(n: number): string {
+	if (n < 1000) return `${n}`;
+	if (n < 1_000_000) return `${(n / 1000).toFixed(1)}k`;
+	return `${(n / 1_000_000).toFixed(1)}M`;
+}
+
+function buildUsageParts(
+	usage: UsageTotals,
+	contextTokens: number | undefined,
+	contextWindow: number | undefined,
+): string[] {
+	const parts = [
+		`↑${formatTokens(usage.input)}`,
+		`↓${formatTokens(usage.output)}`,
+	];
+	if (usage.cacheRead > 0) parts.push(`R${formatTokens(usage.cacheRead)}`);
+	if (usage.latestCh !== null) parts.push(`CH${usage.latestCh.toFixed(1)}%`);
+	parts.push(`$${usage.cost.toFixed(3)}`);
+	if (typeof contextTokens === "number" && contextTokens > 0 && contextWindow) {
+		parts.push(
+			`${((contextTokens / contextWindow) * 100).toFixed(1)}%/${formatTokens(contextWindow)}`,
+		);
+	}
+	return parts;
+}
+
 export default function (pi: ExtensionAPI) {
-  pi.on("session_start", async (_event, ctx) => {
-    if (ctx.mode !== "tui" || !ctx.hasUI) return;
+	pi.on("session_start", (_event, ctx) => {
+		if (ctx.mode !== "tui" || !ctx.hasUI) return;
 
-    ctx.ui.setFooter((tui, theme, footerData) => {
-      const unsub = footerData.onBranchChange(() => tui.requestRender());
+		ctx.ui.setFooter((tui, theme, footerData) => {
+			const unsub = footerData.onBranchChange(() => tui.requestRender());
 
-      return {
-        dispose: unsub,
-        invalidate() {},
-        render(width: number): string[] {
-          let input = 0,
-            output = 0,
-            cacheRead = 0,
-            cacheWrite = 0,
-            cost = 0;
-          let latestCh: number | null = null;
-
-          const entries = ctx.sessionManager.getBranch();
-          for (let i = entries.length - 1; i >= 0; i--) {
-            const e = entries[i];
-            if (e.type !== "message" || e.message.role !== "assistant") continue;
-            const usage = (e.message as AssistantMessage).usage;
-            if (!usage) continue;
-            input += usage.input ?? 0;
-            output += usage.output ?? 0;
-            cacheRead += usage.cacheRead ?? 0;
-            cacheWrite += usage.cacheWrite ?? 0;
-            cost += usage.cost?.total ?? 0;
-            // CH is computed from the latest assistant prompt only.
-            const denom = (usage.input ?? 0) + (usage.cacheRead ?? 0) + (usage.cacheWrite ?? 0);
-            if (latestCh === null && denom > 0) {
-              latestCh = ((usage.cacheRead ?? 0) / denom) * 100;
-            }
-          }
-
-          const fmt = (n: number) => {
-            if (n < 1000) return `${n}`;
-            if (n < 1_000_000) return `${(n / 1000).toFixed(1)}k`;
-            return `${(n / 1_000_000).toFixed(1)}M`;
-          };
-
-          const parts = [`↑${fmt(input)}`, `↓${fmt(output)}`];
-          if (cacheRead > 0) parts.push(`R${fmt(cacheRead)}`);
-          if (latestCh !== null) parts.push(`CH${latestCh.toFixed(1)}%`);
-          parts.push(`$${cost.toFixed(3)}`);
-
-          const ctxUsage = ctx.getContextUsage?.();
-          const window = ctx.model?.contextWindow;
-          if (ctxUsage && typeof ctxUsage.tokens === "number" && ctxUsage.tokens > 0 && window) {
-            parts.push(`${((ctxUsage.tokens / window) * 100).toFixed(1)}%/${fmt(window)}`);
-          }
-
-          const left = theme.fg("dim", parts.join(" "));
-          const branch = footerData.getGitBranch();
-          const right = theme.fg(
-            "dim",
-            `${ctx.model?.id || "no-model"}${branch ? ` (${branch})` : ""}`,
-          );
-
-          const pad = " ".repeat(Math.max(1, width - visibleWidth(left) - visibleWidth(right)));
-          return [truncateToWidth(left + pad + right, width)];
-        },
-      };
-    });
-  });
+			return {
+				dispose: unsub,
+				invalidate() {},
+				render(width: number): string[] {
+					const usage = computeUsage(ctx.sessionManager.getBranch());
+					const ctxUsage = ctx.getContextUsage?.();
+					const left = theme.fg(
+						"dim",
+						buildUsageParts(
+							usage,
+							ctxUsage?.tokens,
+							ctx.model?.contextWindow,
+						).join(" "),
+					);
+					const branch = footerData.getGitBranch();
+					const right = theme.fg(
+						"dim",
+						`${ctx.model?.id || "no-model"}${branch ? ` (${branch})` : ""}`,
+					);
+					const pad = " ".repeat(
+						Math.max(1, width - visibleWidth(left) - visibleWidth(right)),
+					);
+					return [truncateToWidth(left + pad + right, width)];
+				},
+			};
+		});
+	});
 }

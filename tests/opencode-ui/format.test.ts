@@ -77,3 +77,22 @@ test("formatCostLabel", () => {
 	assert.equal(formatCostLabel(1.5), "$1.50");
 	assert.equal(formatCostLabel(0), "");
 });
+
+test("ansiStrip removes DCS and APC sequences", () => {
+	assert.equal(ansiStrip("\x1bP1;2cat\x1b\\"), "");
+	assert.equal(ansiStrip("\x1b_pi:c\x07"), "");
+});
+
+test("visibleWidth treats escape sequences as zero width", () => {
+	assert.equal(visibleWidth("\x1b_pi:c\x07ab"), 2);
+	assert.equal(visibleWidth("a\x1b[31mb\x1b[0mc"), 3);
+	assert.equal(visibleWidth("\x1bP1;2cat\x1b\\x"), 1);
+});
+
+test("truncateToWidth never splits the cursor marker", () => {
+	const marker = "\x1b_pi:c\x07";
+	const result = truncateToWidth(marker + "abcdefgh", 4);
+	assert.ok(result.includes(marker), `marker must survive: ${JSON.stringify(result)}`);
+	assert.equal(visibleWidth(result), 4);
+	assert.ok(result.endsWith("…"));
+});

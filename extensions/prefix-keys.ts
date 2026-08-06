@@ -49,7 +49,6 @@ const DEFAULT_CONFIG: PrefixConfig = {
 		t: "command:/tree",
 		f: "command:/fork",
 		r: "command:/resume",
-		z: "command:/zentui",
 		T: "key:shift+tab",
 		o: "command:/compact",
 		c: "command:/copy",

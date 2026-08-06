@@ -36,7 +36,10 @@ export function buildGauge(percent: number, width: number): string {
 export function ansiStrip(text: string): string {
 	return text
 		.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "")
-		.replace(/\x1b\][^\x07]*(?:\x07|\x1b\\)/g, "");
+		.replace(/\x1b\][^\x07]*(?:\x07|\x1b\\)/g, "")
+		// DCS (\x1bP…\x1b\) and APC (\x1b_…\x1b\) or \x1b_…\x07, e.g. pi's
+		// cursor marker \x1b_pi:c\x07) — either ST or BEL terminates.
+		.replace(/\x1b[P_][\s\S]*?(?:\x1b\\|\x07)/g, "");
 }
 
 export function visibleWidth(text: string): number {
@@ -64,15 +67,54 @@ export function padTo(text: string, width: number): string {
 	return text + " ".repeat(pad);
 }
 
+/**
+ * Length of the escape sequence starting at `text[index]` (which must be
+ * "\x1b"), or 1 for a lone ESC. Handles CSI, OSC, DCS, and APC; DCS/APC may
+ * be terminated by ST ("\x1b\\") or BEL ("\x07"). Returns a length that
+ * covers the whole sequence so callers never split one.
+ */
+function escapeSequenceLength(text: string, index: number): number {
+	const rest = text.slice(index + 1);
+	if (rest.startsWith("[")) {
+		// CSI: params + intermediates, then one final byte in 0x40-0x7E.
+		for (let i = 1; i < rest.length; i++) {
+			const code = rest.charCodeAt(i);
+			if (code >= 0x40 && code <= 0x7e) return i + 2;
+		}
+		return rest.length + 1;
+	}
+	if (rest.startsWith("]") || rest.startsWith("P") || rest.startsWith("_")) {
+		const body = rest.slice(1);
+		const st = body.indexOf("\x1b\\");
+		const bel = body.indexOf("\x07");
+		if (st !== -1 && (bel === -1 || st < bel)) return st + 4; // 1 ESC + 1 intro + st + 2 ST
+		if (bel !== -1) return bel + 3; // 1 ESC + 1 intro + bel + 1 BEL
+		return rest.length + 1; // unterminated: consume the rest
+	}
+	return 1;
+}
+
 export function truncateToWidth(text: string, width: number, ellipsis = "…"): string {
 	if (visibleWidth(text) <= width) return text;
 	let out = "";
 	let w = 0;
-	for (const ch of text) {
+	const budget = width - visibleWidth(ellipsis);
+	let i = 0;
+	while (i < text.length) {
+		const ch = text[i];
+		if (ch === "\x1b") {
+			// Zero-width sequence: always include it wholesale — never split it,
+			// even past the budget, so pi's cursor marker survives truncation.
+			const len = escapeSequenceLength(text, i);
+			out += text.slice(i, i + len);
+			i += len;
+			continue;
+		}
 		const cw = visibleWidth(ch);
-		if (w + cw > width - visibleWidth(ellipsis)) break;
+		if (w + cw > budget) break;
 		out += ch;
 		w += cw;
+		i += 1;
 	}
 	return out + ellipsis;
 }
@@ -114,6 +156,5 @@ export function formatContextLabel(
 export function formatCostLabel(cost: number): string {
 	if (!Number.isFinite(cost) || cost <= 0) return "";
 	if (cost < 0.01) return `$${cost.toFixed(3)}`;
-	if (cost < 1) return `$${cost.toFixed(2)}`;
 	return `$${cost.toFixed(2)}`;
 }

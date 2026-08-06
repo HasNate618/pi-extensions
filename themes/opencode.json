@@ -44,7 +44,7 @@
     "mdHr": "dim",
     "mdListBullet": "accent",
     "toolDiffAdded": "accent",
-    "toolDiffRemoved": "error",
+    "toolDiffRemoved": "#f0626e",
     "toolDiffContext": "muted",
     "syntaxComment": "dim",
     "syntaxKeyword": "#c792ea",

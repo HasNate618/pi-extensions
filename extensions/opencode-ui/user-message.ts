@@ -1,5 +1,4 @@
 import {
-	type ExtensionAPI,
 	type Theme,
 	UserMessageComponent,
 } from "@earendil-works/pi-coding-agent";

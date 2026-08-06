@@ -143,3 +143,19 @@ test("user message block wraps long content", () => {
 	assert.equal(lines.length, 5);
 	assert.ok((lines[1] ?? "").includes("one two"));
 });
+
+test("user message block is idempotent for pre-wrapped lines", () => {
+	const single = composeUserMessageBlock({
+		width: 12,
+		lines: ["one two three four"],
+		style: identity,
+		config,
+	});
+	const preWrapped = composeUserMessageBlock({
+		width: 12,
+		lines: ["one two", "three", "four"],
+		style: identity,
+		config,
+	});
+	assert.deepEqual(single, preWrapped);
+});

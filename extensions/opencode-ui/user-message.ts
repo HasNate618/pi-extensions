@@ -53,13 +53,20 @@ export function installUserMessagePatch(
 		RENDER_KEY,
 		(receiver, args) => {
 			const width = args[0];
+			const saved = (prototype as Record<string, unknown>)[`__oc_${RENDER_KEY}`];
 			if (typeof width !== "number") {
-				return (receiver.render as () => string[]).call(receiver, ...args);
+				return typeof saved === "function"
+					? (saved as (...args: unknown[]) => string[]).call(receiver, ...args)
+					: [];
 			}
-			const previous = (prototype as Record<string, unknown>)[`__oc_${RENDER_KEY}`];
+			const config = configProvider();
+			const contentMax = Math.max(
+				1,
+				width - config.margins.left - config.margins.right - 1 - 2,
+			);
 			const base =
-				typeof previous === "function"
-					? (previous as (width: number) => string[]).call(receiver, width)
+				typeof saved === "function"
+					? (saved as (w: number) => string[]).call(receiver, contentMax)
 					: [];
 			const lines = Array.isArray(base) ? base : [];
 			const uiTheme = uiThemeProvider();
@@ -68,12 +75,7 @@ export function installUserMessagePatch(
 				if (role === "rail") return uiTheme.fg("border", text);
 				return text;
 			};
-			return composeUserMessageBlock({
-				width,
-				lines,
-				style,
-				config: configProvider(),
-			});
+			return composeUserMessageBlock({ width, lines, style, config });
 		},
 	);
 	currentCleanup = () => {

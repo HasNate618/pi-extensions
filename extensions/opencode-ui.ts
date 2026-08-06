@@ -88,14 +88,20 @@ export default function opencodeUi(pi: ExtensionAPI): void {
 	let activeCtx: ExtensionContext | null = null;
 	let config: OpenCodeUiConfig = parseConfig(undefined);
 
+	let usageRefreshPending = false;
 	const refreshUsage = (ctx: ExtensionContext): void => {
-		if (!state) return;
-		const entries = getEntries(ctx);
-		const fingerprint = computeUsageFingerprint(entries);
-		if (fingerprint === state.usageFingerprint) return;
-		state.usageFingerprint = fingerprint;
-		state.cost = computeUsageTotals(entries).cost;
-		requestRender(ctx);
+		if (usageRefreshPending) return;
+		usageRefreshPending = true;
+		setImmediate(() => {
+			usageRefreshPending = false;
+			if (!state || activeCtx !== ctx) return;
+			const entries = getEntries(ctx);
+			const fingerprint = computeUsageFingerprint(entries);
+			if (fingerprint === state.usageFingerprint) return;
+			state.usageFingerprint = fingerprint;
+			state.cost = computeUsageTotals(entries).cost;
+			requestRender(ctx);
+		});
 	};
 
 	pi.on("session_start", (_event, ctx) => {

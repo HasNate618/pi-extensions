@@ -1,7 +1,7 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { Component } from "@earendil-works/pi-tui";
 import type { OpenCodeUiConfig } from "./config.ts";
-import { buildGauge } from "./format.ts";
+import { buildGauge, formatContextLabel, formatCostLabel } from "./format.ts";
 import { composeFooterLines, type Styler } from "./layout.ts";
 
 export type FooterRenderData = {
@@ -13,15 +13,18 @@ export type FooterRenderData = {
 export class OpencodeFooter implements Component {
 	private readonly config: OpenCodeUiConfig;
 	private readonly uiTheme: Theme;
+	private readonly leftLabel: () => string;
 	private readonly getData: () => FooterRenderData;
 
 	constructor(
 		config: OpenCodeUiConfig,
 		uiTheme: Theme,
+		leftLabel: () => string,
 		getData: () => FooterRenderData,
 	) {
 		this.config = config;
 		this.uiTheme = uiTheme;
+		this.leftLabel = leftLabel;
 		this.getData = getData;
 	}
 
@@ -46,37 +49,12 @@ export class OpencodeFooter implements Component {
 		return composeFooterLines({
 			width,
 			left: this.leftLabel(),
-			contextLabel: this.formatContext(data),
+			contextLabel: formatContextLabel(data.tokens, data.contextWindow),
 			gauge: buildGauge(percent, this.config.gaugeWidth),
-			costLabel: this.formatCost(data.cost),
+			costLabel: formatCostLabel(data.cost),
 			style: this.styleRole,
 			config: this.config,
 		});
-	}
-
-	private leftLabel(): string {
-		// Overridden by the entry via a getter when git data is wired in;
-		// kept as a plain method so the component stays self-contained.
-		return "";
-	}
-
-	private formatContext(data: FooterRenderData): string {
-		const { tokens: used, contextWindow } = data;
-		if (!contextWindow || contextWindow <= 0) return "--";
-		const count = typeof used === "number" && used >= 0 ? used : 0;
-		const compact = (value: number): string =>
-			value < 1000
-				? String(Math.round(value))
-				: value < 1_000_000
-					? `${Math.round(value / 1000)}k`
-					: `${(value / 1_000_000).toFixed(1)}M`;
-		return `${compact(count)}/${compact(contextWindow)}`;
-	}
-
-	private formatCost(cost: number): string {
-		if (!Number.isFinite(cost) || cost <= 0) return "";
-		if (cost < 0.01) return `$${cost.toFixed(3)}`;
-		return `$${cost.toFixed(2)}`;
 	}
 
 	invalidate(): void {}

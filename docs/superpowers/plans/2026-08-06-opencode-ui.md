@@ -522,7 +522,7 @@ export function formatCostLabel(cost: number): string {
 
 - [ ] **Step 4: Run format tests to verify they pass**
 
-Run: `node --test "tests/opencode-ui/*.test.ts"format.test.ts`
+Run: `node --test tests/opencode-ui/format.test.ts`
 Expected: PASS (12 tests). If `wrapText`/`buildGauge` rounding differs, adjust implementation to match the asserted values (round-half-up `Math.round` is the intended behavior).
 
 - [ ] **Step 5: Implement `border.ts`**
@@ -569,7 +569,7 @@ export function stripEditorFrame(
 
 - [ ] **Step 6: Run border tests to verify they pass**
 
-Run: `node --test "tests/opencode-ui/*.test.ts"border.test.ts`
+Run: `node --test tests/opencode-ui/border.test.ts`
 Expected: PASS (3 tests).
 
 - [ ] **Step 7: Implement `config.ts`**
@@ -642,7 +642,7 @@ function stringOr(value: unknown, fallback: string): string {
 
 - [ ] **Step 8: Run config tests to verify they pass**
 
-Run: `node --test "tests/opencode-ui/*.test.ts"config.test.ts`
+Run: `node --test tests/opencode-ui/config.test.ts`
 Expected: PASS (4 tests).
 
 - [ ] **Step 9: Implement `usage.ts`**
@@ -717,7 +717,7 @@ export function computeUsageFingerprint(entries: readonly SessionEntry[]): strin
 
 - [ ] **Step 10: Run usage tests to verify they pass**
 
-Run: `node --test "tests/opencode-ui/*.test.ts"usage.test.ts`
+Run: `node --test tests/opencode-ui/usage.test.ts`
 Expected: PASS (2 tests).
 
 - [ ] **Step 11: Run the full suite**

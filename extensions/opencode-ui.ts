@@ -71,11 +71,11 @@ function contentToText(content: unknown): string | undefined {
 function getEntries(ctx: ExtensionContext): readonly SessionEntry[] {
 	const manager = ctx.sessionManager as {
 		getEntries?: () => readonly SessionEntry[];
-		getBranch: () => readonly SessionEntry[];
+		getBranch?: () => readonly SessionEntry[];
 	};
-	return typeof manager.getEntries === "function"
-		? manager.getEntries()
-		: manager.getBranch();
+	if (typeof manager.getEntries === "function") return manager.getEntries();
+	if (typeof manager.getBranch === "function") return manager.getBranch();
+	return [];
 }
 
 function requestRender(ctx: ExtensionContext): void {
@@ -87,6 +87,7 @@ export default function opencodeUi(pi: ExtensionAPI): void {
 	let state: SessionState | null = null;
 	let activeCtx: ExtensionContext | null = null;
 	let config: OpenCodeUiConfig = parseConfig(undefined);
+	let offBranchChange: (() => void) | null = null;
 
 	let usageRefreshPending = false;
 	const refreshUsage = (ctx: ExtensionContext): void => {
@@ -121,8 +122,6 @@ export default function opencodeUi(pi: ExtensionAPI): void {
 		);
 
 		ctx.ui.setFooter((_tui, _theme, footerData) => {
-			const branch = footerData.getGitBranch();
-			const project = basename(footerData.cwd ?? "");
 			const getData = (): FooterRenderData => {
 				const usage = ctx.getContextUsage() as
 					| { tokens?: number | null; contextWindow?: number }
@@ -134,9 +133,20 @@ export default function opencodeUi(pi: ExtensionAPI): void {
 				};
 			};
 			const leftLabel = (): string => {
+				const branch = footerData.getGitBranch();
+				const project = basename(footerData.cwd ?? "");
 				const b = branch ?? "";
 				return b ? `${project}:${b}` : project;
 			};
+			const subscribe = (
+				footerData as { onBranchChange?: (cb: () => void) => () => void }
+			).onBranchChange;
+			offBranchChange?.();
+			offBranchChange =
+				subscribe?.(() => {
+					if (activeCtx !== ctx) return;
+					requestRender(ctx);
+				}) ?? null;
 			return new OpencodeFooter(config, ctx.ui.theme, leftLabel, getData);
 		});
 
@@ -148,6 +158,8 @@ export default function opencodeUi(pi: ExtensionAPI): void {
 
 	pi.on("session_shutdown", () => {
 		removeUserMessagePatch();
+		offBranchChange?.();
+		offBranchChange = null;
 		state = null;
 		activeCtx = null;
 	});

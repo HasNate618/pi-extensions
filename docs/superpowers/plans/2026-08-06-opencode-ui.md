@@ -13,7 +13,7 @@
 - **Erasable TS only** in all `.ts` files (node native type-stripping): no `enum`, no `namespace`, no parameter properties (`constructor(private x)` is forbidden — declare fields and assign), no `import =`.
 - **Relative imports must use explicit `.ts` extensions** (e.g. `import { x } from "./format.ts"`) — required by node's ESM type-stripping, supported by bun.
 - **Pure modules must not import `@earendil-works/*`** (node tests cannot resolve them): `format.ts`, `border.ts`, `config.ts`, `usage.ts`, `layout.ts`, and all `tests/opencode-ui/*.test.ts`.
-- **Test runner:** `node --test tests/opencode-ui/` from repo root (`~/Projects/pi-extensions`); node v24.18.0 available.
+- **Test runner:** `node --test "tests/opencode-ui/*.test.ts"` from repo root (`~/Projects/pi-extensions`); node v24.18.0 available.
 - **Code style:** match repo (tabs for indent, double quotes, semicolons, `import type` for type-only imports) — see `extensions/prefix-keys.ts`.
 - **Chrome colors** resolve from theme tokens at render time by default (rail=`border`, bar=`accent`, model=`accent`, provider=`muted`, thinking=thinking tokens); config may override with raw strings.
 - **No timers/polling** in runtime paths; invalidate + `tui.requestRender()` only on data-change events.
@@ -73,7 +73,7 @@ test("opencode theme defines all required color tokens", () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `node --test tests/opencode-ui/`
+Run: `node --test "tests/opencode-ui/*.test.ts"`
 Expected: FAIL — `ENOENT` reading `themes/opencode.json`.
 
 - [ ] **Step 3: Create the theme**
@@ -152,7 +152,7 @@ Create `themes/opencode.json` (dark neutral bg, green accent; every required tok
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `node --test tests/opencode-ui/`
+Run: `node --test "tests/opencode-ui/*.test.ts"`
 Expected: PASS (1 test).
 
 - [ ] **Step 5: Register the theme in the package manifest**
@@ -391,7 +391,7 @@ test("computeUsageFingerprint changes when entries change", () => {
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `node --test tests/opencode-ui/`
+Run: `node --test "tests/opencode-ui/*.test.ts"`
 Expected: FAIL — modules cannot be resolved (`ERR_MODULE_NOT_FOUND` for `../../extensions/opencode-ui/format.ts` etc.).
 
 - [ ] **Step 3: Implement `format.ts`**
@@ -522,7 +522,7 @@ export function formatCostLabel(cost: number): string {
 
 - [ ] **Step 4: Run format tests to verify they pass**
 
-Run: `node --test tests/opencode-ui/format.test.ts`
+Run: `node --test "tests/opencode-ui/*.test.ts"format.test.ts`
 Expected: PASS (12 tests). If `wrapText`/`buildGauge` rounding differs, adjust implementation to match the asserted values (round-half-up `Math.round` is the intended behavior).
 
 - [ ] **Step 5: Implement `border.ts`**
@@ -569,7 +569,7 @@ export function stripEditorFrame(
 
 - [ ] **Step 6: Run border tests to verify they pass**
 
-Run: `node --test tests/opencode-ui/border.test.ts`
+Run: `node --test "tests/opencode-ui/*.test.ts"border.test.ts`
 Expected: PASS (3 tests).
 
 - [ ] **Step 7: Implement `config.ts`**
@@ -642,7 +642,7 @@ function stringOr(value: unknown, fallback: string): string {
 
 - [ ] **Step 8: Run config tests to verify they pass**
 
-Run: `node --test tests/opencode-ui/config.test.ts`
+Run: `node --test "tests/opencode-ui/*.test.ts"config.test.ts`
 Expected: PASS (4 tests).
 
 - [ ] **Step 9: Implement `usage.ts`**
@@ -717,12 +717,12 @@ export function computeUsageFingerprint(entries: readonly SessionEntry[]): strin
 
 - [ ] **Step 10: Run usage tests to verify they pass**
 
-Run: `node --test tests/opencode-ui/usage.test.ts`
+Run: `node --test "tests/opencode-ui/*.test.ts"usage.test.ts`
 Expected: PASS (2 tests).
 
 - [ ] **Step 11: Run the full suite**
 
-Run: `node --test tests/opencode-ui/`
+Run: `node --test "tests/opencode-ui/*.test.ts"`
 Expected: PASS (21 tests total across the 5 files).
 
 - [ ] **Step 12: Type-check**
@@ -1054,7 +1054,7 @@ import { composeFooterLines } from "../../extensions/opencode-ui/layout.ts";
 
 test("footer aligns left and right segments with margins", () => {
  const lines = composeFooterLines({
-  width: 30,
+  width: 45,
   left: "proj:main",
   contextLabel: "229k/1M",
   gauge: "▰▰▰▰▱▱▱▱▱▱▱▱▱",
@@ -1067,7 +1067,7 @@ test("footer aligns left and right segments with margins", () => {
  const line = lines[0] ?? "";
  assert.ok(line.startsWith(" proj:main"));
  assert.ok(line.endsWith("▰▰▰▰▱▱▱▱▱▱▱▱▱ 229k/1M · $0.005 "));
- assert.equal(line.length, 30);
+ assert.equal(line.length, 45);
 });
 
 test("footer without cost omits it", () => {
@@ -1279,7 +1279,7 @@ test("user message block draws rail around content", () => {
   style: identity,
   config,
  });
- assert.deepEqual(lines, [" ┃         ", " ┃  Hello  ", " ┃         "]);
+ assert.deepEqual(lines, [" ┃          ", " ┃  Hello   ", " ┃          "]);
 });
 
 test("user message block wraps long content", () => {
@@ -1289,7 +1289,8 @@ test("user message block wraps long content", () => {
   style: identity,
   config,
  });
- assert.equal(lines.length, 4);
+ // contentMax = 12-1-1-1-2 = 7 → ["one two", "three", "four"] + 2 rail rows
+ assert.equal(lines.length, 5);
  assert.ok((lines[1] ?? "").includes("one two"));
 });
 ```
@@ -1675,7 +1676,7 @@ Expected: clean. Fix any API mismatches (`footerData.cwd`, `footerData.getGitBra
 
 - [ ] **Step 3: Run the full unit suite**
 
-Run: `node --test tests/opencode-ui/`
+Run: `node --test "tests/opencode-ui/*.test.ts"`
 Expected: PASS (21+ tests; unchanged by this task).
 
 - [ ] **Step 4: Live verification**
@@ -1816,7 +1817,7 @@ const refreshUsage = (ctx: ExtensionContext): void => {
 
 - [ ] **Step 2: Type-check + tests**
 
-Run `lsp_diagnostics` on `extensions/opencode-ui/`; run `node --test tests/opencode-ui/`.
+Run `lsp_diagnostics` on `extensions/opencode-ui/`; run `node --test "tests/opencode-ui/*.test.ts"`.
 Expected: clean; all tests pass.
 
 - [ ] **Step 3: CPU measurement**
@@ -1853,7 +1854,7 @@ Walk the design doc (`docs/superpowers/specs/2026-08-06-opencode-ui-design.md`) 
 
 - [ ] **Step 2: Final full-suite run + type-check**
 
-Run: `node --test tests/opencode-ui/` then `lsp_diagnostics` on `extensions/` and `tests/`.
+Run: `node --test "tests/opencode-ui/*.test.ts"` then `lsp_diagnostics` on `extensions/` and `tests/`.
 Expected: all green.
 
 - [ ] **Step 3: Final visual pass**

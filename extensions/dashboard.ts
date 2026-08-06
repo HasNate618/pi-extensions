@@ -8,13 +8,18 @@
  *   j/k (or up/down)  scroll sessions
  *   enter             open the selected session (default = most recent)
  *   n                 start a new session
- *   tab               filter/search sessions (esc cancels)
+ *   /                 filter/search sessions (esc cancels)
  *   q / esc           quit pi
  *
- * The terminal pane is cleared when the dashboard mounts and again right
- * before pi shuts down, so no leftover TUI frames sit in the shell history.
+ * On startup, the dashboard is skipped entirely when the cwd has no
+ * sessions, letting pi proceed straight to a fresh session.
+ *
+ * The terminal pane is cleared when the dashboard mounts, and again right
+ * before pi shuts down (after leaving the alternate screen buffer so the
+ * clear lands on the main buffer), so no leftover TUI frames or stale shell
+ * content remain after pi exits.
  */
-import { execSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { statSync } from "node:fs";
 import { basename } from "node:path";
 import {
@@ -43,12 +48,15 @@ const LOGO = [
 ];
 
 // Nerd Font icons (no emoji).
-const ICON_NEW = "\uF067"; // nf-fa-plus
 const ICON_CLOCK = "\uF017"; // nf-fa-clock-o
 const ICON_BRANCH = "\uE0A0"; // nf-dev-git_branch
 
-/** Clear screen + home. Used on mount and just before shutdown. */
+/** Clear screen + home. Used on mount (clears the alternate screen). */
 const CLEAR = "\x1b[2J\x1b[H";
+
+/** Exit the alternate screen, then clear the main buffer + home. Used just
+ * before pi shuts down so the user is left with a clean terminal. */
+const CLEAR_ON_EXIT = "\x1b[?1049l" + CLEAR;
 
 /** Max width of the centered content column; wider terminals get margins. */
 const MAX_CONTENT_WIDTH = 72;
@@ -111,13 +119,17 @@ function formatRelativeTime(mtimeMs: number): string {
 }
 
 function getGitBranch(): string {
-	try {
-		return execSync("git rev-parse --abbrev-ref HEAD", { encoding: "utf8" })
-			.trim()
-			.replace(/^detached at /, "detached");
-	} catch {
+	// spawnSync (not execSync): a failing execSync relays git's stderr to the
+	// terminal even when the error is caught, spamming "fatal: not a git
+	// repository" on every dashboard render. spawnSync never throws or prints.
+	const res = spawnSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
+		encoding: "utf8",
+		timeout: 2000,
+	});
+	if (res.status !== 0) {
 		return "";
 	}
+	return res.stdout.trim().replace(/^detached at /, "detached");
 }
 
 function getCwdDisplay(): string {
@@ -194,7 +206,7 @@ class DashboardComponent implements Component {
 	}
 
 	private handleFilterInput(data: string): boolean {
-		if (matchesKey(data, "escape") || matchesKey(data, "tab")) {
+		if (matchesKey(data, "escape")) {
 			this.filtering = false;
 			this.filter = "";
 			this.snap();
@@ -242,7 +254,7 @@ class DashboardComponent implements Component {
 			this.done({ type: "quit" });
 			return;
 		}
-		if (matchesKey(data, "tab")) {
+		if (matchesKey(data, "/")) {
 			this.filtering = true;
 			this.tui.requestRender();
 		}
@@ -261,16 +273,30 @@ class DashboardComponent implements Component {
 		const statusLine = this.buildStatusLine();
 		const hintLine = this.filtering
 			? `search: ${this.theme.fg("accent", `${this.filter}\u2588`)}`
-			: "j/k scroll · enter continue · n new · tab search · q/esc quit";
+			: "j/k scroll · enter continue · n new · / search · q/esc quit";
 
 		const version = getPiVersionForLine();
+		// Center the logo as a single block (uniform left padding based on the
+		// widest line) so the narrower top half lines up with the bottom half
+		// instead of each line floating on its own center axis.
+		const logoWidth = Math.max(...LOGO.map((l) => visibleWidth(l)));
 		const logoLines = LOGO.map((l) => {
-			const logoWidth = visibleWidth(l);
 			const pad = Math.max(0, Math.floor((contentWidth - logoWidth) / 2));
 			return this.theme.fg("accent", " ".repeat(pad) + l);
 		});
+		// Center a single line within the content column; the render loop below
+		// then adds the column offset, which puts it exactly on the terminal's
+		// center axis (same axis the logo block and session list are on). This
+		// keeps the bottom of the dashboard (version/hint/status) centered
+		// instead of hugging the left edge of the content column.
+		const centerLine = (text: string): string => {
+			const pad = Math.max(0, Math.floor((contentWidth - visibleWidth(text)) / 2));
+			return " ".repeat(pad) + text;
+		};
 		const versionLine =
-			version === "" ? null : this.theme.fg("muted", `pi  ${version}`);
+			version === ""
+				? null
+				: centerLine(this.theme.fg("muted", `pi  ${version}`));
 
 		const blocks: string[][] = [];
 		blocks.push(logoLines);
@@ -280,8 +306,8 @@ class DashboardComponent implements Component {
 		blocks.push([""]);
 		blocks.push(sessionLines);
 		blocks.push([""]);
-		blocks.push([this.theme.fg("muted", hintLine)]);
-		blocks.push([this.theme.fg("dim", statusLine)]);
+		blocks.push([centerLine(this.theme.fg("muted", hintLine))]);
+		blocks.push([centerLine(this.theme.fg("dim", statusLine))]);
 
 		const totalHeight = blocks.reduce((sum, b) => sum + b.length, 0);
 		const topPad = Math.max(0, Math.floor((rows - totalHeight) / 2));
@@ -356,10 +382,6 @@ class DashboardComponent implements Component {
 				this.theme.fg("muted", `  ${this.selectedIndex + 1}/${len} sessions`),
 			);
 		}
-		lines.push("");
-		lines.push(
-			`${this.theme.fg("accent", `${ICON_NEW} New session`)}${" ".repeat(Math.max(2, 4))}${this.theme.fg("muted", "n")}`,
-		);
 		return lines;
 	}
 
@@ -405,6 +427,11 @@ export default function (pi: ExtensionAPI) {
 		const sessions = (await SessionManager.list(
 			ctx.cwd,
 		)) as unknown as SessionEntry[];
+		if (sessions.length === 0) {
+			// No sessions in this cwd — nothing to pick from. Skip the
+			// dashboard and let pi proceed with its normal startup.
+			return;
+		}
 		modelForStatus = readModelId(ctx);
 
 		const result = await ctx.ui.custom<DashboardChoice>(
@@ -425,11 +452,7 @@ export default function (pi: ExtensionAPI) {
 		} else if (result?.type === "new") {
 			ctx.sessionManager.newSession();
 		} else if (result?.type === "quit") {
-			try {
-				activeTui?.terminal.write(CLEAR);
-			} catch {
-				// Best-effort.
-			}
+			// session_shutdown clears the terminal (main buffer) before exit.
 			ctx.shutdown();
 		}
 	}
@@ -450,6 +473,20 @@ export default function (pi: ExtensionAPI) {
 			}
 			await showDashboard(ctx);
 		},
+	});
+
+	// Clear the terminal (main buffer) on real exits so no leftover TUI frames
+	// or stale content remain after pi quits. Only on "quit" — never when the
+	// session is being replaced (new/resume/fork/reload).
+	pi.on("session_shutdown", (event) => {
+		if (event.reason !== "quit") {
+			return;
+		}
+		try {
+			activeTui?.terminal.write(CLEAR_ON_EXIT);
+		} catch {
+			// Best-effort.
+		}
 	});
 }
 

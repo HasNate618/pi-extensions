@@ -21,14 +21,14 @@ Restart pi (or `/reload`).
 
 ## dashboard (startup launcher)
 
-Replaces pi's startup screen with a centered launcher: the pi logo, recent sessions, quick actions, and a status line. Terminal pane is cleared on open and on quit.
+Replaces pi's startup screen with a centered launcher: the pi logo, recent sessions, quick actions, and a status line. Terminal pane is cleared on open and on quit. If the current directory has no sessions, the dashboard is skipped and pi starts a new session directly.
 
 | Key | Action |
-|---|---|
+| --- | --- |
 | `j`/`k` (or arrows) | scroll sessions |
 | `enter` | open selected (default: most recent) |
 | `n` | new session |
-| `tab` | filter/search sessions |
+| `/` | filter/search sessions |
 | `q`/`esc` | quit pi |
 
 Reopen anytime with `/dashboard`.

@@ -91,3 +91,24 @@ export function composeFooterLines(options: FooterLayoutOptions): string[] {
 	if (config.margins.bottom) rows.push("");
 	return rows;
 }
+
+export type UserMessageLayoutOptions = {
+	width: number;
+	lines: string[];
+	style: Styler;
+	config: OpenCodeUiConfig;
+};
+
+export function composeUserMessageBlock(options: UserMessageLayoutOptions): string[] {
+	const { width, lines, style, config } = options;
+	const mLeft = config.margins.left;
+	const mRight = config.margins.right;
+	const rail = style(config.railChar, "rail");
+	const contentMax = Math.max(1, width - mLeft - mRight - 1 - 2);
+	const rows: string[] = [" ".repeat(mLeft) + rail];
+	for (const line of lines.flatMap((text) => wrapText(text, contentMax))) {
+		rows.push(" ".repeat(mLeft) + rail + "  " + line);
+	}
+	rows.push(" ".repeat(mLeft) + rail);
+	return rows.map((row) => padTo(row, width));
+}

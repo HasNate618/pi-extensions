@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DEFAULT_CONFIG, type OpenCodeUiConfig } from "../../extensions/opencode-ui/config.ts";
-import { composeComposerLines, composeFooterLines } from "../../extensions/opencode-ui/layout.ts";
+import { composeComposerLines, composeFooterLines, composeUserMessageBlock } from "../../extensions/opencode-ui/layout.ts";
 
 const identity = (text: string): string => text;
 
@@ -120,4 +120,26 @@ test("footer drops bottom blank row when margins.bottom is false", () => {
 		config: noBottom,
 	});
 	assert.equal(lines.length, 1);
+});
+
+test("user message block draws rail around content", () => {
+	const lines = composeUserMessageBlock({
+		width: 12,
+		lines: ["Hello"],
+		style: identity,
+		config,
+	});
+	assert.deepEqual(lines, [" ┃          ", " ┃  Hello   ", " ┃          "]);
+});
+
+test("user message block wraps long content", () => {
+	const lines = composeUserMessageBlock({
+		width: 12,
+		lines: ["one two three four"],
+		style: identity,
+		config,
+	});
+	// contentMax = 12-1-1-1-2 = 7 → ["one two", "three", "four"] + 2 rail rows
+	assert.equal(lines.length, 5);
+	assert.ok((lines[1] ?? "").includes("one two"));
 });

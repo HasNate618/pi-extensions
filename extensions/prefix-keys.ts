@@ -282,9 +282,6 @@ export default function (pi: ExtensionAPI) {
 		config: PrefixConfig,
 		ctx: ExtensionContext,
 	): void {
-		const prefixLabel = Array.isArray(config.prefix)
-			? config.prefix.join("|")
-			: config.prefix;
 		warnOnOverriddenBindings(keybindings, config, ctx);
 
 		// The editor's own submit path is pi's only public command-dispatch
@@ -332,11 +329,6 @@ export default function (pi: ExtensionAPI) {
 
 		const listener: InputListener = (data) => state.handle(data);
 		removeListener = tui.addInputListener(listener);
-
-		ctx.ui.notify(
-			`prefix-keys: ${prefixLabel} is now your prefix. Press it then a mapped key.`,
-			"info",
-		);
 	}
 
 	function warnOnOverriddenBindings(

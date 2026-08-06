@@ -15,6 +15,7 @@
   },
   "pi": {
     "extensions": ["./extensions"],
+    "themes": ["./themes"],
     "subagents": {
       "agents": ["./agents"]
     }

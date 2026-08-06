@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DEFAULT_CONFIG, type OpenCodeUiConfig } from "../../extensions/opencode-ui/config.ts";
-import { composeComposerLines } from "../../extensions/opencode-ui/layout.ts";
+import { composeComposerLines, composeFooterLines } from "../../extensions/opencode-ui/layout.ts";
 
 const identity = (text: string): string => text;
 
@@ -75,4 +75,49 @@ test("composer with margins disabled has no left space", () => {
 		config: noMargin,
 	});
 	assert.equal(lines[0], "┃  M · P  ");
+});
+
+test("footer aligns left and right segments with margins", () => {
+	const lines = composeFooterLines({
+		width: 45,
+		left: "proj:main",
+		contextLabel: "229k/1M",
+		gauge: "▰▰▰▰▱▱▱▱▱▱▱▱▱",
+		costLabel: "$0.005",
+		style: identity,
+		config,
+	});
+	assert.equal(lines.length, 2);
+	assert.equal(lines[1], "");
+	const line = lines[0] ?? "";
+	assert.ok(line.startsWith(" proj:main"));
+	assert.ok(line.endsWith("▰▰▰▰▱▱▱▱▱▱▱▱▱ 229k/1M · $0.005 "));
+	assert.equal(line.length, 45);
+});
+
+test("footer without cost omits it", () => {
+	const lines = composeFooterLines({
+		width: 20,
+		left: "p:b",
+		contextLabel: "1k/2k",
+		gauge: "▰▱",
+		costLabel: "",
+		style: identity,
+		config,
+	});
+	assert.ok((lines[0] ?? "").endsWith("▰▱ 1k/2k "));
+});
+
+test("footer drops bottom blank row when margins.bottom is false", () => {
+	const noBottom = { ...DEFAULT_CONFIG, margins: { left: 1, right: 1, bottom: false } };
+	const lines = composeFooterLines({
+		width: 20,
+		left: "p:b",
+		contextLabel: "1k/2k",
+		gauge: "▰▱",
+		costLabel: "",
+		style: identity,
+		config: noBottom,
+	});
+	assert.equal(lines.length, 1);
 });

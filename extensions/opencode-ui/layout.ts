@@ -59,5 +59,35 @@ export function composeComposerLines(options: ComposerLayoutOptions): string[] {
 	return rows;
 }
 
-// Safety: referenced here so later tasks can reuse; imported at top for visibility.
-void visibleWidth;
+export type FooterLayoutOptions = {
+	width: number;
+	left: string;
+	contextLabel: string;
+	gauge: string;
+	costLabel: string;
+	style: Styler;
+	config: OpenCodeUiConfig;
+};
+
+export function composeFooterLines(options: FooterLayoutOptions): string[] {
+	const { width, left, contextLabel, gauge, costLabel, style, config } = options;
+	const mLeft = config.margins.left;
+	const mRight = config.margins.right;
+	const contentWidth = Math.max(1, width - mLeft - mRight);
+	const rightParts = [gauge, contextLabel].filter(Boolean).join(" ");
+	const costPart = costLabel ? ` · ${costLabel}` : "";
+	const rightText = style(rightParts + costPart, "muted");
+	const rightWidth = visibleWidth(rightText);
+	const leftText = truncateToWidth(
+		style(left, "text"),
+		Math.max(0, contentWidth - rightWidth - 1),
+	);
+	const gap = " ".repeat(
+		Math.max(1, contentWidth - visibleWidth(leftText) - rightWidth),
+	);
+	const rows: string[] = [
+		" ".repeat(mLeft) + leftText + gap + rightText + " ".repeat(Math.max(0, mRight)),
+	];
+	if (config.margins.bottom) rows.push("");
+	return rows;
+}

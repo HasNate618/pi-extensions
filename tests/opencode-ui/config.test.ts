@@ -21,9 +21,9 @@ test("parseConfig merges partial overrides", () => {
 	assert.equal(config.gaugeWidth, 20);
 	assert.equal(config.showThinking, false);
 	assert.equal(config.margins, undefined);
-	assert.equal(config.chatMargins.left, 2);
+	assert.equal(config.chatMargins.left, 3);
 	assert.equal(config.footerMargins.left, 3);
-	assert.equal(config.footerMargins.right, 2);
+	assert.equal(config.footerMargins.right, 3);
 	assert.equal(config.spinnerIntervalMs, 250);
 });
 

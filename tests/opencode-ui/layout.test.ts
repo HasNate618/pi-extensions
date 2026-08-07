@@ -27,20 +27,20 @@ test("composer draws the typed message as a padded box with metadata and bar", (
 	});
 	assert.equal(lines.length, 5);
 	// blank rail row above the typed message (left/right gutters transparent)
-	assert.equal(lines[0], "  ┃" + " ".repeat(17));
+	assert.equal(lines[0], "   ┃" + " ".repeat(16));
 	// the typed message at rail + 2
-	assert.equal(lines[1], "  ┃  input" + " ".repeat(10));
+	assert.equal(lines[1], "   ┃  input" + " ".repeat(9));
 	// blank rail row below the typed message
-	assert.equal(lines[2], "  ┃" + " ".repeat(17));
+	assert.equal(lines[2], "   ┃" + " ".repeat(16));
 	// model · provider · thinking at the bottom, above the bar
-	assert.equal(lines[3], "  ┃  M · P · high" + " ".repeat(3));
-	// bottom edge: half-height glyphs, 2-char indent, 2-char right gutter
-	assert.equal(lines[4], "  ╹" + "▀".repeat(15) + "  ");
+	assert.equal(lines[3], "   ┃  M · P · hi…" + " ".repeat(3));
+	// bottom edge: half-height glyphs, 3-char indent, 3-char right gutter
+	assert.equal(lines[4], "   ╹" + "▀".repeat(13) + "   ");
 });
 
 test("composer wraps multi-line input with blank rail padding rows", () => {
 	const lines = composeComposerLines({
-		width: 12,
+		width: 16,
 		contentLines: ["ab", "cd"],
 		modelLabel: "M",
 		providerLabel: "P",
@@ -48,12 +48,12 @@ test("composer wraps multi-line input with blank rail padding rows", () => {
 		config,
 	});
 	assert.equal(lines.length, 6);
-	assert.equal(lines[0], "  ┃" + " ".repeat(9));
-	assert.equal(lines[1], "  ┃  ab" + " ".repeat(5));
-	assert.equal(lines[2], "  ┃  cd" + " ".repeat(5));
-	assert.equal(lines[3], "  ┃" + " ".repeat(9));
-	assert.equal(lines[4], "  ┃  M · P" + " ".repeat(2));
-	assert.equal(lines[5], "  ╹" + "▀".repeat(7) + "  ");
+	assert.equal(lines[0], "   ┃" + " ".repeat(12));
+	assert.equal(lines[1], "   ┃  ab" + " ".repeat(8));
+	assert.equal(lines[2], "   ┃  cd" + " ".repeat(8));
+	assert.equal(lines[3], "   ┃" + " ".repeat(12));
+	assert.equal(lines[4], "   ┃  M · P" + " ".repeat(5));
+	assert.equal(lines[5], "   ╹" + "▀".repeat(9) + "   ");
 });
 
 test("composer truncates over-wide unbreakable content lines", () => {
@@ -85,11 +85,11 @@ test("composer omits thinking when undefined", () => {
 		style: identity,
 		config,
 	});
-	assert.equal(lines[0], "  ┃" + " ".repeat(17));
-	assert.equal(lines[1], "  ┃  x" + " ".repeat(14));
-	assert.equal(lines[2], "  ┃" + " ".repeat(17));
-	assert.equal(lines[3], "  ┃  M · P" + " ".repeat(10));
-	assert.equal(lines[4], "  ╹" + "▀".repeat(15) + "  ");
+	assert.equal(lines[0], "   ┃" + " ".repeat(16));
+	assert.equal(lines[1], "   ┃  x" + " ".repeat(13));
+	assert.equal(lines[2], "   ┃" + " ".repeat(16));
+	assert.equal(lines[3], "   ┃  M · P" + " ".repeat(9));
+	assert.equal(lines[4], "   ╹" + "▀".repeat(13) + "   ");
 });
 
 test("composer wraps body rows in fill and the edge in bar", () => {
@@ -167,8 +167,10 @@ test("footer aligns left and right segments with margins", () => {
 	assert.equal(lines.length, 2);
 	assert.equal(lines[1], "");
 	const line = lines[0] ?? "";
-	assert.ok(line.startsWith("  proj:main"));
-	assert.ok(line.endsWith("▰▰▰▰▱▱▱▱▱▱▱▱▱ 229k/1M · $0.005  "));
+	assert.ok(line.startsWith("   proj:ma…"));
+	assert.ok(
+		line.endsWith("▰▰▰▰▱▱▱▱▱▱▱▱▱ 229k/1M · $0.005   "),
+	);
 	assert.equal(line.length, 45);
 });
 
@@ -182,7 +184,7 @@ test("footer without cost omits it", () => {
 		style: identity,
 		config,
 	});
-	assert.ok((lines[0] ?? "").endsWith("▰▱ 1k/2k  "));
+	assert.ok((lines[0] ?? "").endsWith("▰▱ 1k/2k   "));
 });
 
 test("footer drops bottom blank row when margins.bottom is false", () => {
@@ -204,15 +206,15 @@ test("footer drops bottom blank row when margins.bottom is false", () => {
 
 test("user message block draws rail around content", () => {
 	const lines = composeUserMessageBlock({
-		width: 12,
+		width: 20,
 		lines: ["Hello"],
 		style: identity,
 		config,
 	});
 	assert.deepEqual(lines, [
-		"  ┃         ",
-		"  ┃  Hello  ",
-		"  ┃         ",
+		"   ┃" + " ".repeat(16),
+		"   ┃  Hello" + " ".repeat(9),
+		"   ┃" + " ".repeat(16),
 	]);
 });
 
@@ -226,7 +228,7 @@ test("user message block applies the fill to every row", () => {
 		return text;
 	};
 	composeUserMessageBlock({
-		width: 12,
+		width: 20,
 		lines: ["Hello"],
 		style: spy,
 		config,
@@ -279,7 +281,7 @@ test("user message block truncates over-wide unbreakable lines", () => {
 			`user-message row exceeds width: ${JSON.stringify(line)}`,
 		);
 	}
-	assert.ok((lines[1] ?? "").startsWith("  ┃  "));
+	assert.ok((lines[1] ?? "").startsWith("   ┃  "));
 });
 
 test("footer never overflows narrow width", () => {

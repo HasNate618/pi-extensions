@@ -81,19 +81,32 @@ export type FooterLayoutOptions = {
 	contextLabel: string;
 	gauge: string;
 	costLabel: string;
+	cacheHitLabel: string;
 	style: Styler;
 	config: OpenCodeUiConfig;
 };
 
 export function composeFooterLines(options: FooterLayoutOptions): string[] {
-	const { width, left, contextLabel, gauge, costLabel, style, config } =
-		options;
+	const {
+		width,
+		left,
+		contextLabel,
+		gauge,
+		costLabel,
+		cacheHitLabel,
+		style,
+		config,
+	} = options;
 	const mLeft = config.footerMargins.left;
 	const mRight = config.footerMargins.right;
 	const contentWidth = Math.max(1, width - mLeft - mRight);
 	// The gauge carries its own per-cell colors (green/yellow/red), so it
 	// is NOT wrapped in the muted style — only the label is.
-	const rightParts = [contextLabel, costLabel ? ` · ${costLabel}` : ""]
+	const rightParts = [
+		contextLabel,
+		cacheHitLabel ? ` · ${cacheHitLabel}` : "",
+		costLabel ? ` · ${costLabel}` : "",
+	]
 		.filter(Boolean)
 		.join("");
 	const rightText = truncateToWidth(

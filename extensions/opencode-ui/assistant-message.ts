@@ -20,9 +20,7 @@ export function installAssistantMessagePatch(
 		PATCH_KEY,
 		(receiver, args) => {
 			const width = args[0];
-			const saved = (prototype as Record<string, unknown>)[
-				`__oc_${PATCH_KEY}`
-			];
+			const saved = (prototype as Record<string, unknown>)[`__oc_${PATCH_KEY}`];
 			if (typeof width !== "number") {
 				return typeof saved === "function"
 					? (saved as (...args: unknown[]) => string[]).call(receiver, ...args)

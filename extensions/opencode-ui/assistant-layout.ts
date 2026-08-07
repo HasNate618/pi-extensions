@@ -8,23 +8,48 @@ import { truncateToWidth, visibleWidth } from "./format.ts";
 const OSC_ZONE = /\x1b\]133;[ABC]\x07/g;
 
 // Width the base render must be called with so markdown/text wraps inside
-// `left`/`right`-cell gutters: the base adds its own 1-char outputPad margin
-// around those lines, which is folded into the gutters.
+// `left`/`right`-cell gutters. The base adds its own 1-char outputPad margin
+// around text lines (folded into the gutters below) and tool-call cards span
+// the whole render width (padded into the gutters by insetRenderedLines).
 export function insetRenderWidth(
 	width: number,
 	left: number,
 	right: number,
 ): number {
-	return Math.max(1, width - left - right + 2);
+	return Math.max(1, width - left - right);
+}
+
+// Shifts tool-call card rows (already rendered at `width - left - right`)
+// into the chatMargins gutters: the card keeps its borders, trimmed
+// defensively if a row ever renders over-wide; kitty image lines pass
+// through untouched. Rows are padded to exactly `width`.
+export function insetToolLines(
+	lines: string[],
+	width: number,
+	left: number,
+	right: number,
+): string[] {
+	const inner = Math.max(1, width - left - right);
+	return lines.map((line) => {
+		if (line.includes("\x1b_G")) return line;
+		const trimmed = truncateToWidth(line, inner, "");
+		return (
+			" ".repeat(left) +
+			trimmed +
+			" ".repeat(Math.max(0, inner - visibleWidth(trimmed))) +
+			" ".repeat(right)
+		);
+	});
 }
 
 // Re-lays out pi's base render (already produced at insetRenderWidth) inside
 // transparent `left`/`right` gutters on the sides. Text lines carry the
 // base's own 1-char outputPad margin, which is folded into the left gutter;
-// tool-call cards span the full render width and are padded to the right
-// (their borders stay intact); kitty image lines pass through untouched. The
-// OSC 133 zones are stripped and re-applied so the shell-integration markers
-// stay at the line edges.
+// tool-call cards span the whole base width and are shifted into the
+// gutters (their borders stay intact, trimmed defensively if a card ever
+// renders over-wide); kitty image lines pass through untouched. The OSC 133
+// zones are stripped and re-applied so the shell-integration markers stay at
+// the line edges.
 export function insetRenderedLines(
 	base: string[],
 	width: number,
@@ -44,8 +69,11 @@ export function insetRenderedLines(
 	const out = stripped.map((line) => {
 		if (line.includes("\x1b_G")) return line;
 		if (!line.startsWith(" ")) {
-			// Tool-call card line: spans the full render width, keep intact.
-			return line + " ".repeat(Math.max(0, width - visibleWidth(line)));
+			// Tool-call card line: spans the whole base width, shift it into
+			// the gutters so the rounded/dynamic borders sit at the margins.
+			return (
+				" ".repeat(left) + truncateToWidth(line, inner) + " ".repeat(right)
+			);
 		}
 		// Markdown/text line: fold the base's 1-char margin into the left gutter.
 		let content = line.slice(1).trimEnd();

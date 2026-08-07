@@ -240,3 +240,19 @@ export function formatCostLabel(cost: number): string {
 	if (cost < 0.01) return `$${cost.toFixed(3)}`;
 	return `$${cost.toFixed(2)}`;
 }
+
+// Prompt-cache hit rate: cached-read tokens as a share of all input read
+// (cached + uncached). Returns "" when there is no cache data at all.
+export function formatCacheHitRate(cacheRead: number, input: number): string {
+	const read =
+		typeof cacheRead === "number" && Number.isFinite(cacheRead) && cacheRead > 0
+			? cacheRead
+			: 0;
+	const uncached =
+		typeof input === "number" && Number.isFinite(input) && input > 0
+			? input
+			: 0;
+	if (read <= 0 && uncached <= 0) return "";
+	const percent = Math.round((read / (read + uncached)) * 100);
+	return `cache ${percent}%`;
+}

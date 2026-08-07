@@ -13,6 +13,7 @@ import {
 	removeUserMessagePatch,
 } from "./opencode-ui/user-message.ts";
 import { installAssistantMessagePatch } from "./opencode-ui/assistant-message.ts";
+import { installToolCardPatch } from "./opencode-ui/tool-card.ts";
 import { installSpinnerThrottle } from "./opencode-ui/spinner.ts";
 import {
 	computeUsageFingerprint,
@@ -40,6 +41,8 @@ type SessionState = {
 	thinkingLabel: string | undefined;
 	usageFingerprint: string;
 	cost: number;
+	cacheRead: number;
+	input: number;
 };
 
 function createState(ctx: ExtensionContext): SessionState {
@@ -52,6 +55,8 @@ function createState(ctx: ExtensionContext): SessionState {
 		thinkingLabel: undefined,
 		usageFingerprint: computeUsageFingerprint(entries),
 		cost: totals.cost,
+		cacheRead: totals.cacheRead,
+		input: totals.input,
 	};
 }
 
@@ -92,6 +97,7 @@ export default function opencodeUi(pi: ExtensionAPI): void {
 	let offSpinnerThrottle: (() => void) | null = null;
 	let offPrefixArmed: (() => void) | null = null;
 	let offAssistantPatch: (() => void) | null = null;
+	let offToolCardPatch: (() => void) | null = null;
 
 	let usageRefreshPending = false;
 	const refreshUsage = (ctx: ExtensionContext): void => {
@@ -99,12 +105,20 @@ export default function opencodeUi(pi: ExtensionAPI): void {
 		usageRefreshPending = true;
 		setImmediate(() => {
 			usageRefreshPending = false;
-			if (!state || activeCtx !== ctx) return;
+			// No activeCtx identity check here: pi hands each event a fresh
+			// context object, so comparing against the session_start context
+			// would always fail and the refresh would never run. The null
+			// state check covers teardown and the fingerprint gate makes the
+			// refresh cheap.
+			if (!state) return;
 			const entries = getEntries(ctx);
 			const fingerprint = computeUsageFingerprint(entries);
 			if (fingerprint === state.usageFingerprint) return;
 			state.usageFingerprint = fingerprint;
-			state.cost = computeUsageTotals(entries).cost;
+			const totals = computeUsageTotals(entries);
+			state.cost = totals.cost;
+			state.cacheRead = totals.cacheRead;
+			state.input = totals.input;
 			requestRender(ctx);
 		});
 	};
@@ -126,6 +140,8 @@ export default function opencodeUi(pi: ExtensionAPI): void {
 		});
 		offAssistantPatch?.();
 		offAssistantPatch = installAssistantMessagePatch(() => config);
+		offToolCardPatch?.();
+		offToolCardPatch = installToolCardPatch(() => config);
 		state = createState(ctx);
 		activeCtx = ctx;
 
@@ -155,6 +171,8 @@ export default function opencodeUi(pi: ExtensionAPI): void {
 					tokens: usage?.tokens ?? 0,
 					contextWindow: usage?.contextWindow,
 					cost: state?.cost ?? 0,
+					cacheRead: state?.cacheRead ?? 0,
+					input: state?.input ?? 0,
 				};
 			};
 			const leftLabel = (): string => {
@@ -190,6 +208,8 @@ export default function opencodeUi(pi: ExtensionAPI): void {
 		setPrefixArmed(false);
 		offAssistantPatch?.();
 		offAssistantPatch = null;
+		offToolCardPatch?.();
+		offToolCardPatch = null;
 		offBranchChange?.();
 		offBranchChange = null;
 		state = null;
@@ -211,10 +231,11 @@ export default function opencodeUi(pi: ExtensionAPI): void {
 		requestRender(ctx);
 	});
 
-	pi.on("message_end", (event, ctx) => {
-		if (!state || event.message?.role !== "user") return;
-		// The composer renders the message being typed live from the editor;
-		// on send there is nothing to keep — only refresh usage/cost.
+	pi.on("message_end", (_event, ctx) => {
+		if (!state) return;
+		// Usage/cost/cache data lands on assistant messages (and tool
+		// results); refresh on every completed message so the footer stays
+		// current. The fingerprint gate makes the refresh cheap.
 		refreshUsage(ctx);
 	});
 

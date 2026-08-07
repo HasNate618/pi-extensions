@@ -15,6 +15,7 @@ import {
 	truncateToWidth,
 	wrapText,
 	userMessageBgFgEscape,
+	formatCacheHitRate,
 	formatContextLabel,
 	formatCostLabel,
 } from "../../extensions/opencode-ui/format.ts";
@@ -178,4 +179,13 @@ test("truncateToWidth never splits the cursor marker", () => {
 	);
 	assert.equal(visibleWidth(result), 4);
 	assert.ok(result.endsWith("…"));
+});
+
+test("formatCacheHitRate reports cached share of read input", () => {
+	assert.equal(formatCacheHitRate(60, 40), "cache 60%");
+	assert.equal(formatCacheHitRate(0, 100), "cache 0%");
+	assert.equal(formatCacheHitRate(100, 0), "cache 100%");
+	assert.equal(formatCacheHitRate(0, 0), "");
+	assert.equal(formatCacheHitRate(25, 25), "cache 50%");
+	assert.equal(formatCacheHitRate(-5, 10), "cache 0%");
 });

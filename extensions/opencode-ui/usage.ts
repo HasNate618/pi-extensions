@@ -56,6 +56,7 @@ export function computeUsageFingerprint(entries: readonly SessionEntry[]): strin
 				entry.message?.role ?? null,
 				entry.message?.usage?.input ?? entry.usage?.input ?? null,
 				entry.message?.usage?.output ?? entry.usage?.output ?? null,
+				entry.message?.usage?.cacheRead ?? entry.usage?.cacheRead ?? null,
 				entry.message?.usage?.cost?.total ?? entry.usage?.cost?.total ?? null,
 			]),
 		)

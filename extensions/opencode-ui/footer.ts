@@ -3,6 +3,7 @@ import type { Component } from "@earendil-works/pi-tui";
 import type { OpenCodeUiConfig } from "./config.ts";
 import {
 	buildGauge,
+	formatCacheHitRate,
 	formatContextLabel,
 	formatCostLabel,
 	gaugeLevel,
@@ -13,6 +14,8 @@ export type FooterRenderData = {
 	tokens: number | null | undefined;
 	contextWindow: number | undefined;
 	cost: number;
+	cacheRead: number;
+	input: number;
 };
 
 export class OpencodeFooter implements Component {
@@ -71,6 +74,7 @@ export class OpencodeFooter implements Component {
 				this.levelColorEscape(p),
 			),
 			costLabel: formatCostLabel(data.cost),
+			cacheHitLabel: formatCacheHitRate(data.cacheRead, data.input),
 			style: this.styleRole,
 			config: this.config,
 		});

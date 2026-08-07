@@ -23,8 +23,8 @@ export type OpenCodeUiConfig = {
 
 export const DEFAULT_CONFIG: OpenCodeUiConfig = {
 	margins: undefined,
-	footerMargins: { left: 2, right: 2 },
-	chatMargins: { left: 2, right: 2 },
+	footerMargins: { left: 3, right: 3 },
+	chatMargins: { left: 3, right: 3 },
 	railChar: "┃",
 	gaugeWidth: 15,
 	spinnerIntervalMs: 500,

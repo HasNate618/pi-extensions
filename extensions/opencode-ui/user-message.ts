@@ -80,7 +80,12 @@ export function installUserMessagePatch(
 			const uiTheme = uiThemeProvider();
 			const style: Styler = (text, role) => {
 				if (!uiTheme) return text;
-				if (role === "rail") return uiTheme.fg("border", text);
+				if (role === "rail") {
+					// Sent messages keep their border-colored sidebar: only the
+					// composer blends into the background while the prefix key is
+					// armed.
+					return uiTheme.fg("border", text);
+				}
 				if (role === "fill") {
 					try {
 						const bgEscape = uiTheme

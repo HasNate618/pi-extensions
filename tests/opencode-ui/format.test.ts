@@ -14,6 +14,7 @@ import {
 	padTo,
 	truncateToWidth,
 	wrapText,
+	userMessageBgFgEscape,
 	formatContextLabel,
 	formatCostLabel,
 } from "../../extensions/opencode-ui/format.ts";
@@ -37,6 +38,21 @@ test("bgToFgEscape rewrites a bg escape to fg", () => {
 	assert.equal(bgToFgEscape("\x1b[49m"), undefined);
 	assert.equal(bgToFgEscape(""), undefined);
 	assert.equal(bgToFgEscape("plain"), undefined);
+});
+
+test("userMessageBgFgEscape derives the box color fg from the theme", () => {
+	const theme = {
+		bg: (color: string): string =>
+			color === "userMessageBg" ? "\x1b[48;2;29;16;11m" : "\x1b[48;2;0;0;0m",
+	};
+	assert.equal(userMessageBgFgEscape(theme), "\x1b[38;2;29;16;11m");
+	// a theme that throws (unknown color) falls back to no color
+	const broken = {
+		bg: (): string => {
+			throw new Error("Unknown theme color");
+		},
+	};
+	assert.equal(userMessageBgFgEscape(broken), "");
 });
 
 test("reapplyBackground keeps a row solid across SGR resets", () => {

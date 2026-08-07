@@ -19,6 +19,7 @@ import {
 	type SessionEntry,
 } from "./opencode-ui/usage.ts";
 import { formatProviderLabel } from "./opencode-ui/format.ts";
+import { setPrefixArmed } from "./opencode-ui/prefix-state.ts";
 
 const CONFIG_FILE = "opencode-ui.json";
 
@@ -88,6 +89,7 @@ export default function opencodeUi(pi: ExtensionAPI): void {
 	let config: OpenCodeUiConfig = parseConfig(undefined);
 	let offBranchChange: (() => void) | null = null;
 	let offSpinnerThrottle: (() => void) | null = null;
+	let offPrefixArmed: (() => void) | null = null;
 
 	let usageRefreshPending = false;
 	const refreshUsage = (ctx: ExtensionContext): void => {
@@ -109,6 +111,17 @@ export default function opencodeUi(pi: ExtensionAPI): void {
 		config = loadConfig();
 		offSpinnerThrottle?.();
 		offSpinnerThrottle = installSpinnerThrottle(config.spinnerIntervalMs);
+		// Subscribe to the prefix-keys extension's armed state (broadcast on the
+		// shared event bus) so the sidebar can blend into the background while
+		// pi listens for the next key. Works whether or not prefix-keys is
+		// installed — without it the event never fires and the sidebar stays
+		// border-colored.
+		offPrefixArmed?.();
+		setPrefixArmed(false);
+		offPrefixArmed = pi.events.on("prefix:armed", (data) => {
+			setPrefixArmed((data as { armed?: boolean } | undefined)?.armed === true);
+			requestRender(ctx);
+		});
 		state = createState(ctx);
 		activeCtx = ctx;
 
@@ -168,6 +181,9 @@ export default function opencodeUi(pi: ExtensionAPI): void {
 		removeUserMessagePatch();
 		offSpinnerThrottle?.();
 		offSpinnerThrottle = null;
+		offPrefixArmed?.();
+		offPrefixArmed = null;
+		setPrefixArmed(false);
 		offBranchChange?.();
 		offBranchChange = null;
 		state = null;

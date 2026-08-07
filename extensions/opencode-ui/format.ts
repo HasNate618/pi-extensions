@@ -30,6 +30,19 @@ export function reapplyBackground(bgEscape: string, text: string): string {
 	return text.replace(/\x1b\[0m/g, `\x1b[0m${bgEscape}`);
 }
 
+type BgTheme = { bg(color: string, text: string): string };
+
+// Foreground escape for the box fill color (userMessageBg), or "" when the
+// theme has no usable token. Used to draw the rail in the box color so it
+// blends into the dark surface instead of standing out.
+export function userMessageBgFgEscape(theme: BgTheme): string {
+	try {
+		return bgToFgEscape(theme.bg("userMessageBg", "")) ?? "";
+	} catch {
+		return "";
+	}
+}
+
 const THINKING_TOKENS: Record<string, string> = {
 	off: "thinkingOff",
 	minimal: "thinkingMinimal",

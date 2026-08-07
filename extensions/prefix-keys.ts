@@ -19,6 +19,11 @@
  * Targets:
  *   "command:/name"  → run a slash command via the session input channel
  *   "key:ctrl+l"     → inject a keybinding chord (limited chord set, see below)
+ *
+ * While armed, the state is broadcast on the shared extension event bus as
+ * `prefix:armed` ({ armed: boolean }) so other extensions (e.g. opencode-ui's
+ * sidebar blending) can react without prefix-keys depending on them; emitting
+ * into the void when nothing listens is harmless.
  */
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -145,6 +150,7 @@ class PrefixState {
 		private config: PrefixConfig,
 		private onIndicator: (label: string | null) => void,
 		private onDispatchCommand: (command: string) => void,
+		private onArmed: (armed: boolean) => void = () => {},
 	) {}
 
 	private isPrefix(data: string): boolean {
@@ -164,6 +170,7 @@ class PrefixState {
 			? this.config.prefix.join("|")
 			: this.config.prefix;
 		this.onIndicator(`prefix ⌗ (${prefixLabel})`);
+		this.onArmed(true);
 		this.scheduleDisarm();
 	}
 
@@ -183,6 +190,7 @@ class PrefixState {
 			this.timer = undefined;
 		}
 		this.onIndicator(null);
+		this.onArmed(false);
 	}
 
 	private scheduleDisarm(): void {
@@ -323,6 +331,12 @@ export default function (pi: ExtensionAPI) {
 				}
 				void Promise.resolve(editor.onSubmit(command)).catch(() => {});
 			},
+			(armed) =>
+				// Broadcast the armed state on the shared extension event bus so
+				// other extensions (e.g. opencode-ui's sidebar blending) can react
+				// without prefix-keys depending on them. Emitting into the void
+				// when no listener is attached is harmless.
+				pi.events.emit("prefix:armed", { armed }),
 		);
 		activePrefix = state;
 
@@ -406,6 +420,7 @@ interface SelfTestHarness {
 		state: PrefixState;
 		indicators: Array<string | null>;
 		commands: string[];
+		armedStates: boolean[];
 	};
 }
 
@@ -427,6 +442,7 @@ function runSelfTest(): void {
 		makeState(timeoutMs = 10000) {
 			const indicators: Array<string | null> = [];
 			const commands: string[] = [];
+			const armedStates: boolean[] = [];
 			const state = new PrefixState(
 				{
 					prefix: "ctrl+x",
@@ -439,8 +455,9 @@ function runSelfTest(): void {
 				},
 				(label) => indicators.push(label),
 				(command) => commands.push(command),
+				(armed) => armedStates.push(armed),
 			);
-			return { state, indicators, commands };
+			return { state, indicators, commands, armedStates };
 		},
 	};
 
@@ -461,19 +478,20 @@ function runSelfTest(): void {
 		{
 			name: "prefix arms",
 			run: (h) => {
-				const { state, indicators } = h.makeState();
+				const { state, indicators, armedStates } = h.makeState();
 				const r = state.handle("\x18"); // ctrl+x
 				h.check("prefix: consumed while idle", r?.consume === true);
 				h.check(
 					"prefix: armed indicator shown",
 					(indicators.at(-1) ?? "").includes("prefix ⌗"),
 				);
+				h.check("armed: state notified on arm", armedStates.at(-1) === true);
 			},
 		},
 		{
 			name: "armed dispatches command",
 			run: (h) => {
-				const { state, indicators, commands } = h.makeState();
+				const { state, indicators, commands, armedStates } = h.makeState();
 				state.handle("\x18");
 				const r = state.handle("m");
 				h.check("armed: mapped key consumed", r?.consume === true);
@@ -484,6 +502,10 @@ function runSelfTest(): void {
 				h.check(
 					"armed: flash label set",
 					(indicators.at(-1) ?? "").includes("→ /model"),
+				);
+				h.check(
+					"armed: state notified on disarm",
+					armedStates.at(-1) === false,
 				);
 			},
 		},
@@ -502,7 +524,7 @@ function runSelfTest(): void {
 		{
 			name: "escape cancels",
 			run: (h) => {
-				const { state, indicators } = h.makeState();
+				const { state, indicators, armedStates } = h.makeState();
 				state.handle("\x18");
 				const r = state.handle("\x1b");
 				h.check("armed: escape cancels and consumes", r?.consume === true);
@@ -510,6 +532,7 @@ function runSelfTest(): void {
 					"armed: indicator cleared on cancel",
 					indicators.at(-1) === null,
 				);
+				h.check("armed: state cleared on cancel", armedStates.at(-1) === false);
 			},
 		},
 		{

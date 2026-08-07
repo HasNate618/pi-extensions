@@ -8,11 +8,12 @@ import type { EditorTheme } from "@earendil-works/pi-tui/dist/components/editor.
 import { stripEditorFrame } from "./border.ts";
 import type { OpenCodeUiConfig } from "./config.ts";
 import {
-	bgToFgEscape,
 	reapplyBackground,
 	thinkingTokenForLevel,
+	userMessageBgFgEscape,
 } from "./format.ts";
 import { composeComposerLines, type Styler } from "./layout.ts";
+import { isPrefixArmed } from "./prefix-state.ts";
 
 export type ComposerState = {
 	modelLabel: string;
@@ -41,8 +42,16 @@ export class ComposerEditor extends CustomEditor {
 
 	private styleRole: Styler = (text, role) => {
 		switch (role) {
-			case "rail":
+			case "rail": {
+				// While the prefix key is armed (listening for the next key) the
+				// sidebar blends into the background: draw the rail in the box's
+				// own dark color instead of the border color.
+				if (isPrefixArmed()) {
+					const fg = userMessageBgFgEscape(this.uiTheme);
+					return fg ? `${fg}${text}\x1b[39m` : text;
+				}
 				return this.uiTheme.fg("border", text);
+			}
 			case "fill": {
 				// Solid dark box fill behind the whole row (opencode renders its
 				// composer as a solid background box). The editor's cursor block
@@ -64,15 +73,8 @@ export class ComposerEditor extends CustomEditor {
 				// Half-height edge glyphs in the same dark color as the fill. The
 				// palette has no fg token for the box color (userMessageBg is a
 				// bg-only key), so derive the fg escape from the bg escape.
-				let glyph: string;
-				try {
-					const bg = this.uiTheme.bg("userMessageBg", "");
-					const fgEscape = bgToFgEscape(bg);
-					glyph = fgEscape ? `${fgEscape}${text}\x1b[39m` : text;
-				} catch {
-					glyph = text;
-				}
-				return glyph;
+				const fgEscape = userMessageBgFgEscape(this.uiTheme);
+				return fgEscape ? `${fgEscape}${text}\x1b[39m` : text;
 			}
 			case "model":
 				return this.uiTheme.fg("accent", text);

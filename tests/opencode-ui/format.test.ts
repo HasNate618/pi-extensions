@@ -5,8 +5,10 @@ import {
 	formatProviderLabel,
 	bgToFgEscape,
 	reapplyBackground,
+	stripBaseMessageBox,
 	thinkingTokenForLevel,
 	buildGauge,
+	gaugeLevel,
 	ansiStrip,
 	visibleWidth,
 	padTo,
@@ -47,6 +49,30 @@ test("reapplyBackground keeps a row solid across SGR resets", () => {
 	assert.equal(reapplyBackground(bg, "plain"), "plain");
 });
 
+test("stripBaseMessageBox removes the native box around content", () => {
+	const bg = "\x1b[48;2;18;20;20m";
+	const lines = [
+		"\x1b]133;A\x07" + bg + "                   \x1b[49m",
+		bg + " Hello \x1b[38;2;1;2;3mworld\x1b[39m      \x1b[49m",
+		"\x1b]133;B\x07\x1b]133;C\x07" + bg + "                   \x1b[49m",
+	];
+	assert.deepEqual(stripBaseMessageBox(lines), [
+		"Hello \x1b[38;2;1;2;3mworld\x1b[39m",
+	]);
+});
+
+test("stripBaseMessageBox keeps interior blank lines (paragraphs)", () => {
+	const bg = "\x1b[48;2;18;20;20m";
+	const lines = [
+		bg + "       \x1b[49m",
+		bg + " a\x1b[49m",
+		bg + "       \x1b[49m",
+		bg + " b\x1b[49m",
+		bg + "       \x1b[49m",
+	];
+	assert.deepEqual(stripBaseMessageBox(lines), ["a", "", "b"]);
+});
+
 test("thinkingTokenForLevel maps levels", () => {
 	assert.equal(thinkingTokenForLevel("high"), "thinkingHigh");
 	assert.equal(thinkingTokenForLevel("max"), "thinkingMax");
@@ -54,11 +80,29 @@ test("thinkingTokenForLevel maps levels", () => {
 	assert.equal(thinkingTokenForLevel("bogus"), "thinkingOff");
 });
 
-test("buildGauge fills blocks", () => {
-	assert.equal(buildGauge(0, 13), "▱".repeat(13));
-	assert.equal(buildGauge(100, 13), "▰".repeat(13));
-	assert.equal(buildGauge(50, 13), "▰".repeat(7) + "▱".repeat(6));
-	assert.equal(buildGauge(150, 13), "▰".repeat(13));
+test("buildGauge fills blocks with level-colored filled cells", () => {
+	const noColor = (): string => "";
+	assert.equal(ansiStrip(buildGauge(0, 13, noColor)), "▱".repeat(13));
+	assert.equal(ansiStrip(buildGauge(100, 13, noColor)), "▰".repeat(13));
+	assert.equal(
+		ansiStrip(buildGauge(50, 13, noColor)),
+		"▰".repeat(7) + "▱".repeat(6),
+	);
+	assert.equal(visibleWidth(buildGauge(77, 15, noColor)), 15);
+	// the filled cells carry the provider color, the empty cells reset
+	const mark = (percent: number): string =>
+		percent < 50 ? "G" : percent < 80 ? "Y" : "R";
+	assert.ok(buildGauge(100, 13, mark).startsWith("R▰"));
+	assert.ok(buildGauge(0, 13, mark).includes("\x1b[39m▱"));
+});
+
+test("gaugeLevel thresholds", () => {
+	assert.equal(gaugeLevel(0), "success");
+	assert.equal(gaugeLevel(49), "success");
+	assert.equal(gaugeLevel(50), "warning");
+	assert.equal(gaugeLevel(79), "warning");
+	assert.equal(gaugeLevel(80), "error");
+	assert.equal(gaugeLevel(100), "error");
 });
 
 test("ansiStrip removes escape codes", () => {

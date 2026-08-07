@@ -15,12 +15,14 @@ test("parseConfig merges partial overrides", () => {
 		gaugeWidth: 20,
 		showThinking: false,
 		footerMargins: { left: 3 },
+		spinnerIntervalMs: 250,
 	});
 	assert.equal(config.gaugeWidth, 20);
 	assert.equal(config.showThinking, false);
 	assert.equal(config.margins.left, 1);
 	assert.equal(config.footerMargins.left, 3);
 	assert.equal(config.footerMargins.right, 2);
+	assert.equal(config.spinnerIntervalMs, 250);
 });
 
 test("parseConfig rejects invalid types", () => {
@@ -31,13 +33,15 @@ test("parseConfig rejects invalid types", () => {
 	assert.throws(() => parseConfig({ footerMargins: { left: "x" } }));
 });
 
-test("parseConfig clamps margins to 0..4", () => {
+test("parseConfig clamps margins and spinner interval", () => {
 	const config = parseConfig({
 		margins: { left: 9, right: -1, bottom: true },
 		footerMargins: { left: 99, right: -3 },
+		spinnerIntervalMs: 10,
 	});
 	assert.equal(config.margins.left, 4);
 	assert.equal(config.margins.right, 0);
 	assert.equal(config.footerMargins.left, 4);
 	assert.equal(config.footerMargins.right, 0);
+	assert.equal(config.spinnerIntervalMs, 100);
 });

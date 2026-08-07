@@ -3,6 +3,7 @@ import {
 	UserMessageComponent,
 } from "@earendil-works/pi-coding-agent";
 import type { OpenCodeUiConfig } from "./config.ts";
+import { reapplyBackground, stripBaseMessageBox } from "./format.ts";
 import { composeUserMessageBlock, type Styler } from "./layout.ts";
 
 const RENDER_KEY = "opencode-ui-user-message-render";
@@ -66,15 +67,30 @@ export function installUserMessagePatch(
 				1,
 				width - config.margins.left - config.margins.right - 1 - 2,
 			);
+			// Render 2 wider so the base box's own 1-char side padding leaves
+			// the markdown wrapped at exactly contentMax.
 			const base =
 				typeof saved === "function"
-					? (saved as (w: number) => string[]).call(receiver, contentMax)
+					? (saved as (w: number) => string[]).call(receiver, contentMax + 2)
 					: [];
-			const lines = Array.isArray(base) ? base : [];
+			// The base render wraps the content in pi's native userMessageBg
+			// box (padding rows + full-width background + 1-char left pad);
+			// strip it so the opencode layout owns the box.
+			const lines = Array.isArray(base) ? stripBaseMessageBox(base) : [];
 			const uiTheme = uiThemeProvider();
 			const style: Styler = (text, role) => {
 				if (!uiTheme) return text;
 				if (role === "rail") return uiTheme.fg("border", text);
+				if (role === "fill") {
+					try {
+						const bgEscape = uiTheme
+							.bg("userMessageBg", "")
+							.replace(/\x1b\[49m$/, "");
+						return `${bgEscape}${reapplyBackground(bgEscape, text)}\x1b[49m`;
+					} catch {
+						return text;
+					}
+				}
 				return text;
 			};
 			return composeUserMessageBlock({ width, lines, style, config });

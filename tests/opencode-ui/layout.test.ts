@@ -28,12 +28,12 @@ test("composer draws the typed message as a padded box with metadata and bar", (
 	assert.equal(lines.length, 5);
 	// blank rail row above the typed message (left/right gutters transparent)
 	assert.equal(lines[0], " ┃" + " ".repeat(18));
-	// the typed message at rail + 1
-	assert.equal(lines[1], " ┃ input" + " ".repeat(12));
+	// the typed message at rail + 2
+	assert.equal(lines[1], " ┃  input" + " ".repeat(11));
 	// blank rail row below the typed message
 	assert.equal(lines[2], " ┃" + " ".repeat(18));
 	// model · provider · thinking at the bottom, above the bar
-	assert.equal(lines[3], " ┃ M · P · high" + " ".repeat(5));
+	assert.equal(lines[3], " ┃  M · P · high" + " ".repeat(4));
 	// bottom edge: half-height glyphs, 1-char indent, 2-char right gutter
 	assert.equal(lines[4], " ╹" + "▀".repeat(16) + "  ");
 });
@@ -49,10 +49,10 @@ test("composer wraps multi-line input with blank rail padding rows", () => {
 	});
 	assert.equal(lines.length, 6);
 	assert.equal(lines[0], " ┃" + " ".repeat(10));
-	assert.equal(lines[1], " ┃ ab" + " ".repeat(7));
-	assert.equal(lines[2], " ┃ cd" + " ".repeat(7));
+	assert.equal(lines[1], " ┃  ab" + " ".repeat(6));
+	assert.equal(lines[2], " ┃  cd" + " ".repeat(6));
 	assert.equal(lines[3], " ┃" + " ".repeat(10));
-	assert.equal(lines[4], " ┃ M · P" + " ".repeat(4));
+	assert.equal(lines[4], " ┃  M · P" + " ".repeat(3));
 	assert.equal(lines[5], " ╹" + "▀".repeat(8) + "  ");
 });
 
@@ -86,9 +86,9 @@ test("composer omits thinking when undefined", () => {
 		config,
 	});
 	assert.equal(lines[0], " ┃" + " ".repeat(18));
-	assert.equal(lines[1], " ┃ x" + " ".repeat(16));
+	assert.equal(lines[1], " ┃  x" + " ".repeat(15));
 	assert.equal(lines[2], " ┃" + " ".repeat(18));
-	assert.equal(lines[3], " ┃ M · P" + " ".repeat(12));
+	assert.equal(lines[3], " ┃  M · P" + " ".repeat(11));
 	assert.equal(lines[4], " ╹" + "▀".repeat(16) + "  ");
 });
 
@@ -110,8 +110,8 @@ test("composer wraps body rows in fill and the edge in bar", () => {
 		config,
 	});
 	const roles = calls.map(([, role]) => role);
-	// every body row (padding, message, metadata) is wrapped in "fill"; the
-	// edge uses "bar" for corner and glyphs (no fill on the bar row)
+	// every body row (padding, message, metadata) is wrapped in "fill" plus
+	// the bar's corner sits on the fill; the edge glyphs use "bar"
 	assert.ok(
 		roles.includes("fill"),
 		`expected fill role, got ${roles.join(",")}`,
@@ -129,7 +129,8 @@ test("composer wraps body rows in fill and the edge in bar", () => {
 		calls.some(([, r]) => r === "muted"),
 		"metadata muted role",
 	);
-	// the bar row's left gutter is transparent (no fill on the margin)
+	// 4 body rows (padding, message, padding, metadata); the rail and the
+	// corner sit outside the fill
 	assert.equal(calls.filter(([, r]) => r === "fill").length, 4);
 });
 
@@ -147,9 +148,9 @@ test("composer with margins disabled has no gutters", () => {
 		config: noMargin,
 	});
 	assert.equal(lines[0], "┃" + " ".repeat(9));
-	assert.equal(lines[1], "┃ x" + " ".repeat(7));
+	assert.equal(lines[1], "┃  x" + " ".repeat(6));
 	assert.equal(lines[2], "┃" + " ".repeat(9));
-	assert.equal(lines[3], "┃ M · P" + " ".repeat(3));
+	assert.equal(lines[3], "┃  M · P" + " ".repeat(2));
 	assert.equal(lines[4], "╹" + "▀".repeat(9));
 });
 
@@ -209,6 +210,28 @@ test("user message block draws rail around content", () => {
 		config,
 	});
 	assert.deepEqual(lines, [" ┃          ", " ┃  Hello   ", " ┃          "]);
+});
+
+test("user message block applies the fill to every row", () => {
+	const fillCalls: string[] = [];
+	const spy = (
+		text: string,
+		role: Parameters<typeof identity>[0] extends string ? string : never,
+	): string => {
+		if (role === "fill") fillCalls.push(text);
+		return text;
+	};
+	composeUserMessageBlock({
+		width: 12,
+		lines: ["Hello"],
+		style: spy,
+		config,
+	});
+	// gap row, content row, gap row — all wrapped in the fill; the rail
+	// itself stays outside the fill
+	assert.equal(fillCalls.length, 3);
+	assert.ok((fillCalls[1] ?? "").includes("  Hello"));
+	assert.ok(!(fillCalls[1] ?? "").includes("┃"));
 });
 
 test("user message block wraps long content", () => {

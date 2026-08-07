@@ -12,16 +12,25 @@
  *   q / esc           quit pi
  *
  * On startup, the dashboard is skipped entirely when the cwd has no
- * sessions, letting pi proceed straight to a fresh session.
+ * sessions, letting pi proceed straight to a fresh session. It is also
+ * skipped when pi was launched with a session-selecting CLI flag
+ * (--session/--resume/--continue/--fork), since the opened session was
+ * explicitly chosen.
+ *
+ * Resuming a session re-executes pi with `--session <file>` (or uses
+ * `ctx.switchSession` when invoked via the /dashboard command), because a
+ * real resume requires rebuilding the agent runtime from the saved file —
+ * merely rebinding the session file on the running manager loses history.
  *
  * The terminal pane is cleared when the dashboard mounts, and again right
  * before pi shuts down (after leaving the alternate screen buffer so the
  * clear lands on the main buffer), so no leftover TUI frames or stale shell
  * content remain after pi exits.
  */
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { statSync } from "node:fs";
 import { basename } from "node:path";
+import { buildResumeArgs, hasSessionSelectFlag } from "./dashboard/resume.ts";
 import {
 	decodePrintableKey,
 	matchesKey,
@@ -60,6 +69,23 @@ const CLEAR_ON_EXIT = "\x1b[?1049l" + CLEAR;
 
 /** Max width of the centered content column; wider terminals get margins. */
 const MAX_CONTENT_WIDTH = 72;
+
+/** Re-exec pi with `--session <file>` so the full session-replacement lifecycle
+ * runs: the runtime is rebuilt from the saved file, restoring the conversation
+ * history, model, and thinking level. `ctx.sessionManager.setSessionFile()`
+ * alone cannot do this — it only rebinds the file pointer on the existing
+ * session manager, leaving the agent runtime on the fresh startup session
+ * (history gone). The current process shuts down and the child takes over the
+ * terminal. Returns the spawned child for callers that want to await exit. */
+function relaunchPiWithSession(file: string): ReturnType<typeof spawn> {
+	const child = spawn(
+		process.execPath,
+		buildResumeArgs(process.argv.slice(2), file),
+		{ stdio: "inherit" },
+	);
+	child.unref();
+	return child;
+}
 
 const OVERLAY_OPTIONS = {
 	overlay: true,
@@ -448,7 +474,23 @@ export default function (pi: ExtensionAPI) {
 		);
 
 		if (result?.type === "resume" && result.file !== "") {
-			ctx.sessionManager.setSessionFile(result.file);
+			// A real session switch needs the full replacement lifecycle
+			// (teardown + runtime rebuild from the saved file). `setSessionFile`
+			// only rebinds the file pointer on the current session manager and
+			// leaves the agent runtime on the fresh startup session — history
+			// is lost. `ctx.switchSession` exists only on command contexts, so:
+			//  - invoked via the `/dashboard` command → use it directly;
+			//  - shown at startup (session_start event ctx has no
+			//    switchSession) → re-exec `pi --session <file>`.
+			const anyCtx = ctx as ExtensionContext & {
+				switchSession?: (file: string, opts?: unknown) => Promise<unknown>;
+			};
+			if (typeof anyCtx.switchSession === "function") {
+				await anyCtx.switchSession(result.file);
+			} else {
+				relaunchPiWithSession(result.file);
+				ctx.shutdown();
+			}
 		} else if (result?.type === "new") {
 			ctx.sessionManager.newSession();
 		} else if (result?.type === "quit") {
@@ -459,6 +501,12 @@ export default function (pi: ExtensionAPI) {
 
 	pi.on("session_start", async (event, ctx) => {
 		if (event.reason !== "startup" || ctx.mode !== "tui") {
+			return;
+		}
+		// pi was asked to open/select a specific session on the command line
+		// (e.g. the re-exec from a dashboard resume) — don't overlay the
+		// dashboard on top of it.
+		if (hasSessionSelectFlag(process.argv.slice(2))) {
 			return;
 		}
 		await showDashboard(ctx);

@@ -7,7 +7,11 @@ import type { TUI } from "@earendil-works/pi-tui";
 import type { EditorTheme } from "@earendil-works/pi-tui/dist/components/editor.ts";
 import { stripEditorFrame } from "./border.ts";
 import type { OpenCodeUiConfig } from "./config.ts";
-import { bgToFgEscape, reapplyBackground, thinkingTokenForLevel } from "./format.ts";
+import {
+	bgToFgEscape,
+	reapplyBackground,
+	thinkingTokenForLevel,
+} from "./format.ts";
 import { composeComposerLines, type Styler } from "./layout.ts";
 
 export type ComposerState = {
@@ -84,12 +88,12 @@ export class ComposerEditor extends CustomEditor {
 	};
 
 	override render(width: number): string[] {
-		// One column narrower than the box so the editor's own wrap width
+		// Two columns narrower than the box so the editor's own wrap width
 		// (inner - 1, reserving a column for the cursor) equals the composer's
 		// text budget — full lines fit without a spurious ellipsis.
 		const inner = Math.max(
 			0,
-			width - this.config.margins.left - this.config.margins.right - 1,
+			width - this.config.margins.left - this.config.margins.right - 2,
 		);
 		if (inner <= 4) return super.render(width);
 		const base = super.render(inner);

@@ -44,10 +44,52 @@ export function thinkingTokenForLevel(level: string | undefined): string {
 	return (level && THINKING_TOKENS[level]) || "thinkingOff";
 }
 
-export function buildGauge(percent: number, width: number): string {
+const SGR_FG_RESET = "\x1b[39m";
+
+// Theme token for the gauge's filled cells by context load: success < 50%,
+// warning < 80%, error otherwise. The caller maps the token to a color from
+// the active theme.
+export function gaugeLevel(percent: number): "success" | "warning" | "error" {
+	if (percent < 50) return "success";
+	if (percent < 80) return "warning";
+	return "error";
+}
+
+export function buildGauge(
+	percent: number,
+	width: number,
+	colorForPercent: (percent: number) => string,
+): string {
 	const clamped = Math.max(0, Math.min(100, percent));
 	const filled = Math.round((clamped / 100) * width);
-	return "▰".repeat(filled) + "▱".repeat(Math.max(0, width - filled));
+	return (
+		colorForPercent(clamped) +
+		"▰".repeat(filled) +
+		SGR_FG_RESET +
+		"▱".repeat(Math.max(0, width - filled))
+	);
+}
+
+// pi's native user-message render wraps the markdown in a Box with a
+// userMessageBg fill: OSC 133 shell zones on the first/last lines, a
+// full-width background on every line, 1 char of left padding on the
+// content, and one empty padding row above/below. The opencode layout
+// replaces that box with its own, so strip the native one: remove the OSC
+// zones, the background escapes, the left padding, and the leading/trailing
+// padding rows (interior blank lines — markdown paragraphs — are kept).
+export function stripBaseMessageBox(lines: string[]): string[] {
+	const stripped = lines.map((line) => {
+		let s = line.replace(/\x1b\][^\x07]*(?:\x07|\x1b\\)/g, "");
+		s = s.replace(/^\x1b\[48;([0-9;]+)m/, "");
+		s = s.replace(/\x1b\[49m\s*$/, "").trimEnd();
+		if (s.startsWith(" ")) s = s.slice(1);
+		return s;
+	});
+	let start = 0;
+	let end = stripped.length;
+	while (start < end && stripped[start] === "") start++;
+	while (end > start && stripped[end - 1] === "") end--;
+	return stripped.slice(start, end);
 }
 
 export function ansiStrip(text: string): string {

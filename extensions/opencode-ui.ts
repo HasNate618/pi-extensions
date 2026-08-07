@@ -12,6 +12,7 @@ import {
 	installUserMessagePatch,
 	removeUserMessagePatch,
 } from "./opencode-ui/user-message.ts";
+import { installSpinnerThrottle } from "./opencode-ui/spinner.ts";
 import {
 	computeUsageFingerprint,
 	computeUsageTotals,
@@ -86,6 +87,7 @@ export default function opencodeUi(pi: ExtensionAPI): void {
 	let activeCtx: ExtensionContext | null = null;
 	let config: OpenCodeUiConfig = parseConfig(undefined);
 	let offBranchChange: (() => void) | null = null;
+	let offSpinnerThrottle: (() => void) | null = null;
 
 	let usageRefreshPending = false;
 	const refreshUsage = (ctx: ExtensionContext): void => {
@@ -105,6 +107,8 @@ export default function opencodeUi(pi: ExtensionAPI): void {
 
 	pi.on("session_start", (_event, ctx) => {
 		config = loadConfig();
+		offSpinnerThrottle?.();
+		offSpinnerThrottle = installSpinnerThrottle(config.spinnerIntervalMs);
 		state = createState(ctx);
 		activeCtx = ctx;
 
@@ -162,6 +166,8 @@ export default function opencodeUi(pi: ExtensionAPI): void {
 
 	pi.on("session_shutdown", () => {
 		removeUserMessagePatch();
+		offSpinnerThrottle?.();
+		offSpinnerThrottle = null;
 		offBranchChange?.();
 		offBranchChange = null;
 		state = null;

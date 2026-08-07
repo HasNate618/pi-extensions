@@ -12,6 +12,9 @@ export type OpenCodeUiConfig = {
 	footerMargins: { left: number; right: number };
 	railChar: string;
 	gaugeWidth: number;
+	// Minimum ms between spinner ticks (pi's built-in loader defaults to 80ms
+	// and re-renders the whole TUI per tick).
+	spinnerIntervalMs: number;
 	showThinking: boolean;
 };
 
@@ -19,7 +22,8 @@ export const DEFAULT_CONFIG: OpenCodeUiConfig = {
 	margins: { left: 1, right: 2, bottom: true },
 	footerMargins: { left: 2, right: 2 },
 	railChar: "┃",
-	gaugeWidth: 13,
+	gaugeWidth: 15,
+	spinnerIntervalMs: 500,
 	showThinking: true,
 };
 
@@ -53,6 +57,11 @@ export function parseConfig(raw: unknown): OpenCodeUiConfig {
 			numberOr(source.gaugeWidth, DEFAULT_CONFIG.gaugeWidth),
 			5,
 			40,
+		),
+		spinnerIntervalMs: clamp(
+			numberOr(source.spinnerIntervalMs, DEFAULT_CONFIG.spinnerIntervalMs),
+			100,
+			5000,
 		),
 		showThinking: booleanOr(source.showThinking, DEFAULT_CONFIG.showThinking),
 	};

@@ -1,7 +1,12 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { Component } from "@earendil-works/pi-tui";
 import type { OpenCodeUiConfig } from "./config.ts";
-import { buildGauge, formatContextLabel, formatCostLabel } from "./format.ts";
+import {
+	buildGauge,
+	formatContextLabel,
+	formatCostLabel,
+	gaugeLevel,
+} from "./format.ts";
 import { composeFooterLines, type Styler } from "./layout.ts";
 
 export type FooterRenderData = {
@@ -39,6 +44,18 @@ export class OpencodeFooter implements Component {
 		}
 	};
 
+	// Foreground escape for the gauge's filled cells, from the active theme's
+	// success/warning/error tokens (falls back to no color if the theme lacks
+	// the token).
+	private levelColorEscape(percent: number): string {
+		try {
+			const wrapped = this.uiTheme.fg(gaugeLevel(percent), "");
+			return /^\x1b\[[0-9;]*m/.exec(wrapped)?.[0] ?? "";
+		} catch {
+			return "";
+		}
+	}
+
 	render(width: number): string[] {
 		const data = this.getData();
 		const tokens = data.tokens ?? 0;
@@ -50,7 +67,9 @@ export class OpencodeFooter implements Component {
 			width,
 			left: this.leftLabel(),
 			contextLabel: formatContextLabel(data.tokens, data.contextWindow),
-			gauge: buildGauge(percent, this.config.gaugeWidth),
+			gauge: buildGauge(percent, this.config.gaugeWidth, (p) =>
+				this.levelColorEscape(p),
+			),
 			costLabel: formatCostLabel(data.cost),
 			style: this.styleRole,
 			config: this.config,

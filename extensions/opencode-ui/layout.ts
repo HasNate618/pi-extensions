@@ -21,18 +21,20 @@ export function composeComposerLines(options: ComposerLayoutOptions): string[] {
 	const mLeft = config.margins.left;
 	const mRight = config.margins.right;
 	const rail = style(config.railChar, "rail");
-	// Text budget: the box spans mLeft..width-mRight; the rail and the
-	// 1-space indent sit inside it (matches the editor's own wrap width).
-	const contentMax = Math.max(1, width - mLeft - mRight - 1 - 1);
+	// Text budget: the box spans (rail + 1)..width-mRight; the 2-space
+	// indent sits inside it (matches the editor's own wrap width).
+	const contentMax = Math.max(1, width - mLeft - mRight - 1 - 2);
 	const rows: string[] = [];
 
 	// The composer renders the message being typed as a user message: one
-	// blank rail row above and below, message text at rail + 1. Body rows are
+	// blank rail row above and below, message text at rail + 2. Body rows are
 	// wrapped in the "fill" role so the composer reads as a solid dark box;
-	// the left and right gutters stay transparent.
+	// the rail column itself stays outside the fill (no background behind
+	// the sidebar), and the left/right gutters stay transparent.
 	const bodyRow = (inner: string): string =>
 		" ".repeat(mLeft) +
-		style(padTo(rail + inner, width - mLeft - mRight), "fill") +
+		rail +
+		style(padTo(inner, width - mLeft - mRight - 1), "fill") +
 		" ".repeat(mRight);
 
 	// 1-line vertical padding above the message.
@@ -44,7 +46,7 @@ export function composeComposerLines(options: ComposerLayoutOptions): string[] {
 	// never lets a row exceed `width` (pi hard-crashes on over-wide lines).
 	// Every row carries the full box fill so the composer stays solid.
 	for (const line of contentLines) {
-		rows.push(bodyRow(" " + truncateToWidth(line, contentMax)));
+		rows.push(bodyRow("  " + truncateToWidth(line, contentMax)));
 	}
 
 	// 1-line vertical padding below the message.
@@ -56,12 +58,13 @@ export function composeComposerLines(options: ComposerLayoutOptions): string[] {
 	if (options.thinkingLabel) {
 		metadata += " · " + style(options.thinkingLabel, "thinking");
 	}
-	rows.push(bodyRow(" " + truncateToWidth(metadata, contentMax)));
+	rows.push(bodyRow("  " + truncateToWidth(metadata, contentMax)));
 
 	// Bottom edge: the corner is drawn in the rail color (same as the
-	// vertical line) so it stays visible; the half-height glyphs use the
-	// same dark color as the fill — the box's edge stops at mid-row (the
-	// glyphs' bottom halves stay empty). Both gutters stay transparent.
+	// vertical line) and stays outside the fill like the rail; the
+	// half-height glyphs use the same dark color as the fill — the box's
+	// edge stops at mid-row (the glyphs' bottom halves stay empty). Both
+	// gutters stay transparent.
 	rows.push(
 		" ".repeat(mLeft) +
 			style("╹", "rail") +
@@ -87,12 +90,13 @@ export function composeFooterLines(options: FooterLayoutOptions): string[] {
 	const mLeft = config.footerMargins.left;
 	const mRight = config.footerMargins.right;
 	const contentWidth = Math.max(1, width - mLeft - mRight);
-	const rightParts = [gauge, contextLabel].filter(Boolean).join(" ");
-	const costPart = costLabel ? ` · ${costLabel}` : "";
-	// Cap the right segment so it can never crowd out the left and overflow
-	// the row: reserve contentWidth - 4 for the left plus the separating gap.
+	// The gauge carries its own per-cell colors (green/yellow/red), so it
+	// is NOT wrapped in the muted style — only the label is.
+	const rightParts = [contextLabel, costLabel ? ` · ${costLabel}` : ""]
+		.filter(Boolean)
+		.join("");
 	const rightText = truncateToWidth(
-		style(rightParts + costPart, "muted"),
+		(gauge ? `${gauge} ` : "") + style(rightParts, "muted"),
 		Math.max(0, contentWidth - 4),
 	);
 	const rightWidth = visibleWidth(rightText);
@@ -132,12 +136,17 @@ export function composeUserMessageBlock(
 	const mRight = config.margins.right;
 	const rail = style(config.railChar, "rail");
 	const contentMax = Math.max(1, width - mLeft - mRight - 1 - 2);
-	const rows: string[] = [" ".repeat(mLeft) + rail];
+	// Mirrors the composer: a solid dark box with a rail (outside the
+	// fill), one blank row above and below, message text at rail + 2.
+	const bodyRow = (inner: string): string =>
+		" ".repeat(mLeft) +
+		rail +
+		style(padTo(inner, width - mLeft - mRight - 1), "fill") +
+		" ".repeat(mRight);
+	const rows: string[] = [bodyRow("")];
 	for (const line of lines.flatMap((text) => wrapText(text, contentMax))) {
-		rows.push(
-			" ".repeat(mLeft) + rail + "  " + truncateToWidth(line, contentMax),
-		);
+		rows.push(bodyRow("  " + truncateToWidth(line, contentMax)));
 	}
-	rows.push(" ".repeat(mLeft) + rail);
-	return rows.map((row) => padTo(row, width));
+	rows.push(bodyRow(""));
+	return rows;
 }

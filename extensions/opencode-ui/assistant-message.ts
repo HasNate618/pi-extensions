@@ -1,7 +1,7 @@
 // Assistant-message rendering: pi's native assistant messages span the full
 // terminal width with only the configurable 1-char outputPad inset. To give
 // the chat body the same gutters as the composer/footer, the render is
-// patched to draw the message inside a `chatInset`-cell transparent margin on
+// patched to draw the message inside the `chatMargins` transparent gutters on
 // both sides.
 import { AssistantMessageComponent } from "@earendil-works/pi-coding-agent";
 import type { OpenCodeUiConfig } from "./config.ts";
@@ -28,8 +28,8 @@ export function installAssistantMessagePatch(
 					? (saved as (...args: unknown[]) => string[]).call(receiver, ...args)
 					: [];
 			}
-			const inset = configProvider().chatInset;
-			if (inset <= 0) {
+			const { left, right } = configProvider().chatMargins;
+			if (left <= 0 && right <= 0) {
 				return typeof saved === "function"
 					? (saved as (w: number) => string[]).call(receiver, width)
 					: [];
@@ -38,13 +38,14 @@ export function installAssistantMessagePatch(
 				typeof saved === "function"
 					? (saved as (w: number) => string[]).call(
 							receiver,
-							insetRenderWidth(width, inset),
+							insetRenderWidth(width, left, right),
 						)
 					: [];
 			return insetRenderedLines(
 				Array.isArray(base) ? base : [],
 				width,
-				inset,
+				left,
+				right,
 			);
 		},
 	);

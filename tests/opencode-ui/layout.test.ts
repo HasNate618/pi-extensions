@@ -27,15 +27,15 @@ test("composer draws the typed message as a padded box with metadata and bar", (
 	});
 	assert.equal(lines.length, 5);
 	// blank rail row above the typed message (left/right gutters transparent)
-	assert.equal(lines[0], " ┃" + " ".repeat(18));
+	assert.equal(lines[0], "  ┃" + " ".repeat(17));
 	// the typed message at rail + 2
-	assert.equal(lines[1], " ┃  input" + " ".repeat(11));
+	assert.equal(lines[1], "  ┃  input" + " ".repeat(10));
 	// blank rail row below the typed message
-	assert.equal(lines[2], " ┃" + " ".repeat(18));
+	assert.equal(lines[2], "  ┃" + " ".repeat(17));
 	// model · provider · thinking at the bottom, above the bar
-	assert.equal(lines[3], " ┃  M · P · high" + " ".repeat(4));
-	// bottom edge: half-height glyphs, 1-char indent, 2-char right gutter
-	assert.equal(lines[4], " ╹" + "▀".repeat(16) + "  ");
+	assert.equal(lines[3], "  ┃  M · P · high" + " ".repeat(3));
+	// bottom edge: half-height glyphs, 2-char indent, 2-char right gutter
+	assert.equal(lines[4], "  ╹" + "▀".repeat(15) + "  ");
 });
 
 test("composer wraps multi-line input with blank rail padding rows", () => {
@@ -48,12 +48,12 @@ test("composer wraps multi-line input with blank rail padding rows", () => {
 		config,
 	});
 	assert.equal(lines.length, 6);
-	assert.equal(lines[0], " ┃" + " ".repeat(10));
-	assert.equal(lines[1], " ┃  ab" + " ".repeat(6));
-	assert.equal(lines[2], " ┃  cd" + " ".repeat(6));
-	assert.equal(lines[3], " ┃" + " ".repeat(10));
-	assert.equal(lines[4], " ┃  M · P" + " ".repeat(3));
-	assert.equal(lines[5], " ╹" + "▀".repeat(8) + "  ");
+	assert.equal(lines[0], "  ┃" + " ".repeat(9));
+	assert.equal(lines[1], "  ┃  ab" + " ".repeat(5));
+	assert.equal(lines[2], "  ┃  cd" + " ".repeat(5));
+	assert.equal(lines[3], "  ┃" + " ".repeat(9));
+	assert.equal(lines[4], "  ┃  M · P" + " ".repeat(2));
+	assert.equal(lines[5], "  ╹" + "▀".repeat(7) + "  ");
 });
 
 test("composer truncates over-wide unbreakable content lines", () => {
@@ -85,11 +85,11 @@ test("composer omits thinking when undefined", () => {
 		style: identity,
 		config,
 	});
-	assert.equal(lines[0], " ┃" + " ".repeat(18));
-	assert.equal(lines[1], " ┃  x" + " ".repeat(15));
-	assert.equal(lines[2], " ┃" + " ".repeat(18));
-	assert.equal(lines[3], " ┃  M · P" + " ".repeat(11));
-	assert.equal(lines[4], " ╹" + "▀".repeat(16) + "  ");
+	assert.equal(lines[0], "  ┃" + " ".repeat(17));
+	assert.equal(lines[1], "  ┃  x" + " ".repeat(14));
+	assert.equal(lines[2], "  ┃" + " ".repeat(17));
+	assert.equal(lines[3], "  ┃  M · P" + " ".repeat(10));
+	assert.equal(lines[4], "  ╹" + "▀".repeat(15) + "  ");
 });
 
 test("composer wraps body rows in fill and the edge in bar", () => {
@@ -209,7 +209,11 @@ test("user message block draws rail around content", () => {
 		style: identity,
 		config,
 	});
-	assert.deepEqual(lines, [" ┃          ", " ┃  Hello   ", " ┃          "]);
+	assert.deepEqual(lines, [
+		"  ┃         ",
+		"  ┃  Hello  ",
+		"  ┃         ",
+	]);
 });
 
 test("user message block applies the fill to every row", () => {
@@ -275,7 +279,7 @@ test("user message block truncates over-wide unbreakable lines", () => {
 			`user-message row exceeds width: ${JSON.stringify(line)}`,
 		);
 	}
-	assert.ok((lines[1] ?? "").startsWith(" ┃  "));
+	assert.ok((lines[1] ?? "").startsWith("  ┃  "));
 });
 
 test("footer never overflows narrow width", () => {

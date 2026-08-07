@@ -8,15 +8,19 @@ import { truncateToWidth, visibleWidth } from "./format.ts";
 const OSC_ZONE = /\x1b\]133;[ABC]\x07/g;
 
 // Width the base render must be called with so markdown/text wraps inside
-// `inset`-cell gutters: the base adds its own 1-char outputPad margin around
-// those lines, which is folded into the inset.
-export function insetRenderWidth(width: number, inset: number): number {
-	return Math.max(1, width - 2 * inset + 2);
+// `left`/`right`-cell gutters: the base adds its own 1-char outputPad margin
+// around those lines, which is folded into the gutters.
+export function insetRenderWidth(
+	width: number,
+	left: number,
+	right: number,
+): number {
+	return Math.max(1, width - left - right + 2);
 }
 
 // Re-lays out pi's base render (already produced at insetRenderWidth) inside
-// `inset`-cell transparent gutters on both sides. Text lines carry the base's
-// own 1-char outputPad margin, which is folded into the inset gutter;
+// transparent `left`/`right` gutters on the sides. Text lines carry the
+// base's own 1-char outputPad margin, which is folded into the left gutter;
 // tool-call cards span the full render width and are padded to the right
 // (their borders stay intact); kitty image lines pass through untouched. The
 // OSC 133 zones are stripped and re-applied so the shell-integration markers
@@ -24,9 +28,10 @@ export function insetRenderWidth(width: number, inset: number): number {
 export function insetRenderedLines(
 	base: string[],
 	width: number,
-	inset: number,
+	left: number,
+	right: number,
 ): string[] {
-	const inner = Math.max(1, width - 2 * inset);
+	const inner = Math.max(1, width - left - right);
 	const zones = new Map<number, { start?: string; end?: string }>();
 	const stripped = base.map((line, index) => {
 		// pi prepends the zones: ZONE_START to the first line, ZONE_END +
@@ -42,14 +47,14 @@ export function insetRenderedLines(
 			// Tool-call card line: spans the full render width, keep intact.
 			return line + " ".repeat(Math.max(0, width - visibleWidth(line)));
 		}
-		// Markdown/text line: fold the base's 1-char margin into the inset.
+		// Markdown/text line: fold the base's 1-char margin into the left gutter.
 		let content = line.slice(1).trimEnd();
 		content = truncateToWidth(content, inner, "");
 		return (
-			" ".repeat(inset) +
+			" ".repeat(left) +
 			content +
 			" ".repeat(Math.max(0, inner - visibleWidth(content))) +
-			" ".repeat(inset)
+			" ".repeat(right)
 		);
 	});
 	for (const [index, zone] of zones) {

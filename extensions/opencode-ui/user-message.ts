@@ -2,6 +2,7 @@ import {
 	type Theme,
 	UserMessageComponent,
 } from "@earendil-works/pi-coding-agent";
+import { composerMargins } from "./config.ts";
 import type { OpenCodeUiConfig } from "./config.ts";
 import { reapplyBackground, stripBaseMessageBox } from "./format.ts";
 import { composeUserMessageBlock, type Styler } from "./layout.ts";
@@ -65,7 +66,7 @@ export function installUserMessagePatch(
 			const config = configProvider();
 			const contentMax = Math.max(
 				1,
-				width - config.margins.left - config.margins.right - 1 - 2,
+				width - composerMargins(config).left - composerMargins(config).right - 1 - 2,
 			);
 			// Render 2 wider so the base box's own 1-char side padding leaves
 			// the markdown wrapped at exactly contentMax.

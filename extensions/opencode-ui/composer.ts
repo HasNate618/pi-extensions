@@ -7,6 +7,7 @@ import type { TUI } from "@earendil-works/pi-tui";
 import type { EditorTheme } from "@earendil-works/pi-tui/dist/components/editor.ts";
 import { stripEditorFrame } from "./border.ts";
 import type { OpenCodeUiConfig } from "./config.ts";
+import { composerMargins } from "./config.ts";
 import {
 	reapplyBackground,
 	thinkingTokenForLevel,
@@ -95,7 +96,7 @@ export class ComposerEditor extends CustomEditor {
 		// text budget — full lines fit without a spurious ellipsis.
 		const inner = Math.max(
 			0,
-			width - this.config.margins.left - this.config.margins.right - 2,
+			width - composerMargins(this.config).left - composerMargins(this.config).right - 2,
 		);
 		if (inner <= 4) return super.render(width);
 		const base = super.render(inner);

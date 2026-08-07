@@ -1,4 +1,5 @@
 import type { OpenCodeUiConfig } from "./config.ts";
+import { composerMargins } from "./config.ts";
 import { padTo, truncateToWidth, visibleWidth, wrapText } from "./format.ts";
 
 export type Styler = (
@@ -18,8 +19,8 @@ export type ComposerLayoutOptions = {
 
 export function composeComposerLines(options: ComposerLayoutOptions): string[] {
 	const { width, contentLines, style, config } = options;
-	const mLeft = config.margins.left;
-	const mRight = config.margins.right;
+	const mLeft = composerMargins(config).left;
+	const mRight = composerMargins(config).right;
 	const rail = style(config.railChar, "rail");
 	// Text budget: the box spans (rail + 1)..width-mRight; the 2-space
 	// indent sits inside it (matches the editor's own wrap width).
@@ -117,7 +118,7 @@ export function composeFooterLines(options: FooterLayoutOptions): string[] {
 						" ".repeat(Math.max(0, mRight)),
 				]
 			: [" ".repeat(width)];
-	if (config.margins.bottom) rows.push("");
+	if (composerMargins(config).bottom) rows.push("");
 	return rows;
 }
 
@@ -132,8 +133,8 @@ export function composeUserMessageBlock(
 	options: UserMessageLayoutOptions,
 ): string[] {
 	const { width, lines, style, config } = options;
-	const mLeft = config.margins.left;
-	const mRight = config.margins.right;
+	const mLeft = composerMargins(config).left;
+	const mRight = composerMargins(config).right;
 	const rail = style(config.railChar, "rail");
 	const contentMax = Math.max(1, width - mLeft - mRight - 1 - 2);
 	// Mirrors the composer: a solid dark box with a rail (outside the

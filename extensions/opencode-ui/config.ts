@@ -5,30 +5,30 @@ export type OpenCodeUiMargins = {
 };
 
 export type OpenCodeUiConfig = {
-	// Composer box margins: left is the transparent rail gutter, right is the
-	// box's right gutter (both lie outside the fill).
-	margins: OpenCodeUiMargins;
+	// Composer/user-message override: when set, wins for those two regions.
+	// Otherwise chatMargins applies everywhere.
+	margins?: OpenCodeUiMargins;
 	// Footer bar insets (the footer has no box, just text insets).
 	footerMargins: { left: number; right: number };
+	// Global chat gutters: composer, user messages, assistant messages,
+	// thinking, and tool-call cards.
+	chatMargins: { left: number; right: number };
 	railChar: string;
 	gaugeWidth: number;
 	// Minimum ms between spinner ticks (pi's built-in loader defaults to 80ms
 	// and re-renders the whole TUI per tick).
 	spinnerIntervalMs: number;
 	showThinking: boolean;
-	// Horizontal transparent gutters for chat messages (the chat body has
-	// no rail — pi's native messages span the full width otherwise).
-	chatInset: number;
 };
 
 export const DEFAULT_CONFIG: OpenCodeUiConfig = {
-	margins: { left: 1, right: 2, bottom: true },
+	margins: undefined,
 	footerMargins: { left: 2, right: 2 },
+	chatMargins: { left: 2, right: 2 },
 	railChar: "┃",
 	gaugeWidth: 15,
 	spinnerIntervalMs: 500,
 	showThinking: true,
-	chatInset: 2,
 };
 
 const clamp = (value: number, min: number, max: number): number =>
@@ -38,12 +38,23 @@ export function parseConfig(raw: unknown): OpenCodeUiConfig {
 	const source = (raw ?? {}) as Record<string, unknown>;
 	const margins = (source.margins ?? {}) as Record<string, unknown>;
 	const footerMargins = (source.footerMargins ?? {}) as Record<string, unknown>;
+	const chatMargins = (source.chatMargins ?? {}) as Record<string, unknown>;
 	const config: OpenCodeUiConfig = {
-		margins: {
-			left: clamp(numberOr(margins.left, DEFAULT_CONFIG.margins.left), 0, 4),
-			right: clamp(numberOr(margins.right, DEFAULT_CONFIG.margins.right), 0, 4),
-			bottom: booleanOr(margins.bottom, DEFAULT_CONFIG.margins.bottom),
-		},
+		margins: source.margins
+			? {
+					left: clamp(
+						numberOr(margins.left, DEFAULT_CONFIG.chatMargins.left),
+						0,
+						4,
+					),
+					right: clamp(
+						numberOr(margins.right, DEFAULT_CONFIG.chatMargins.right),
+						0,
+						4,
+					),
+					bottom: booleanOr(margins.bottom, true),
+				}
+			: undefined,
 		footerMargins: {
 			left: clamp(
 				numberOr(footerMargins.left, DEFAULT_CONFIG.footerMargins.left),
@@ -52,6 +63,18 @@ export function parseConfig(raw: unknown): OpenCodeUiConfig {
 			),
 			right: clamp(
 				numberOr(footerMargins.right, DEFAULT_CONFIG.footerMargins.right),
+				0,
+				4,
+			),
+		},
+		chatMargins: {
+			left: clamp(
+				numberOr(chatMargins.left, DEFAULT_CONFIG.chatMargins.left),
+				0,
+				4,
+			),
+			right: clamp(
+				numberOr(chatMargins.right, DEFAULT_CONFIG.chatMargins.right),
 				0,
 				4,
 			),
@@ -68,13 +91,14 @@ export function parseConfig(raw: unknown): OpenCodeUiConfig {
 			5000,
 		),
 		showThinking: booleanOr(source.showThinking, DEFAULT_CONFIG.showThinking),
-		chatInset: clamp(
-			numberOr(source.chatInset, DEFAULT_CONFIG.chatInset),
-			0,
-			4,
-		),
 	};
 	return config;
+}
+
+// Effective margins for the composer and user-message boxes: the explicit
+// `margins` alias wins when set, otherwise the global chatMargins apply.
+export function composerMargins(config: OpenCodeUiConfig): OpenCodeUiMargins {
+	return config.margins ?? { ...config.chatMargins, bottom: true };
 }
 
 function numberOr(value: unknown, fallback: number): number {

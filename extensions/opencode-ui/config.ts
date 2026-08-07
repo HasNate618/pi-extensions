@@ -16,6 +16,9 @@ export type OpenCodeUiConfig = {
 	// and re-renders the whole TUI per tick).
 	spinnerIntervalMs: number;
 	showThinking: boolean;
+	// Horizontal transparent gutters for chat messages (the chat body has
+	// no rail — pi's native messages span the full width otherwise).
+	chatInset: number;
 };
 
 export const DEFAULT_CONFIG: OpenCodeUiConfig = {
@@ -25,6 +28,7 @@ export const DEFAULT_CONFIG: OpenCodeUiConfig = {
 	gaugeWidth: 15,
 	spinnerIntervalMs: 500,
 	showThinking: true,
+	chatInset: 2,
 };
 
 const clamp = (value: number, min: number, max: number): number =>
@@ -64,6 +68,11 @@ export function parseConfig(raw: unknown): OpenCodeUiConfig {
 			5000,
 		),
 		showThinking: booleanOr(source.showThinking, DEFAULT_CONFIG.showThinking),
+		chatInset: clamp(
+			numberOr(source.chatInset, DEFAULT_CONFIG.chatInset),
+			0,
+			4,
+		),
 	};
 	return config;
 }

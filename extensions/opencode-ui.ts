@@ -12,6 +12,7 @@ import {
 	installUserMessagePatch,
 	removeUserMessagePatch,
 } from "./opencode-ui/user-message.ts";
+import { installAssistantMessagePatch } from "./opencode-ui/assistant-message.ts";
 import { installSpinnerThrottle } from "./opencode-ui/spinner.ts";
 import {
 	computeUsageFingerprint,
@@ -90,6 +91,7 @@ export default function opencodeUi(pi: ExtensionAPI): void {
 	let offBranchChange: (() => void) | null = null;
 	let offSpinnerThrottle: (() => void) | null = null;
 	let offPrefixArmed: (() => void) | null = null;
+	let offAssistantPatch: (() => void) | null = null;
 
 	let usageRefreshPending = false;
 	const refreshUsage = (ctx: ExtensionContext): void => {
@@ -122,6 +124,8 @@ export default function opencodeUi(pi: ExtensionAPI): void {
 			setPrefixArmed((data as { armed?: boolean } | undefined)?.armed === true);
 			requestRender(ctx);
 		});
+		offAssistantPatch?.();
+		offAssistantPatch = installAssistantMessagePatch(() => config);
 		state = createState(ctx);
 		activeCtx = ctx;
 
@@ -184,6 +188,8 @@ export default function opencodeUi(pi: ExtensionAPI): void {
 		offPrefixArmed?.();
 		offPrefixArmed = null;
 		setPrefixArmed(false);
+		offAssistantPatch?.();
+		offAssistantPatch = null;
 		offBranchChange?.();
 		offBranchChange = null;
 		state = null;

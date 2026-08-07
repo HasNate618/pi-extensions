@@ -9,7 +9,7 @@
  * Config: ~/.pi/agent/prefix-keys.json
  *   {
  *     "prefix": "ctrl+x",            // KeyId or KeyId[] (alternative prefixes)
- *     "timeoutMs": 1500,             // auto-disarm after this long with no key
+ *     "timeoutMs": 4000,             // auto-disarm after this long with no key
  *     "bindings": {                  // next-key (parseKey output) -> target
  *       "m": "command:/model",
  *       "T": "key:shift+tab"
@@ -47,7 +47,7 @@ const STATUS_KEY = "prefix";
 
 const DEFAULT_CONFIG: PrefixConfig = {
 	prefix: "ctrl+x",
-	timeoutMs: 1500,
+	timeoutMs: 4000,
 	bindings: {
 		m: "command:/model",
 		n: "command:/new",

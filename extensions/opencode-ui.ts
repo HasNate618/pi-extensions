@@ -8,7 +8,10 @@ import { join } from "node:path";
 import { parseConfig, type OpenCodeUiConfig } from "./opencode-ui/config.ts";
 import { ComposerEditor, type ComposerState } from "./opencode-ui/composer.ts";
 import { OpencodeFooter, type FooterRenderData } from "./opencode-ui/footer.ts";
-import { installUserMessagePatch, removeUserMessagePatch } from "./opencode-ui/user-message.ts";
+import {
+	installUserMessagePatch,
+	removeUserMessagePatch,
+} from "./opencode-ui/user-message.ts";
 import {
 	computeUsageFingerprint,
 	computeUsageTotals,
@@ -29,7 +32,6 @@ function loadConfig(): OpenCodeUiConfig {
 }
 
 type SessionState = {
-	lastMessage: string | undefined;
 	modelLabel: string;
 	providerLabel: string;
 	thinkingLabel: string | undefined;
@@ -39,15 +41,9 @@ type SessionState = {
 
 function createState(ctx: ExtensionContext): SessionState {
 	const entries = getEntries(ctx);
-	const lastUser = [...entries]
-		.reverse()
-		.find((entry) => entry.type === "message" && entry.message?.role === "user");
-	const messageContent = (lastUser?.message as { content?: unknown } | undefined)?.content;
-	const lastMessage = contentToText(messageContent);
 	const model = ctx.model;
 	const totals = computeUsageTotals(entries);
 	return {
-		lastMessage,
 		modelLabel: modelLabelFor(model),
 		providerLabel: formatProviderLabel(model?.provider),
 		thinkingLabel: undefined,
@@ -56,23 +52,15 @@ function createState(ctx: ExtensionContext): SessionState {
 	};
 }
 
-function contentToText(content: unknown): string | undefined {
-	if (typeof content === "string") return content;
-	if (Array.isArray(content)) {
-		return (content as { text?: string }[])
-			.map((part) => (typeof part.text === "string" ? part.text : ""))
-			.join("");
-	}
-	return undefined;
-}
-
 // Some model catalogs (e.g. opencode-go) mark new models with a "(New)"
 // suffix in their display name; strip it so the composer shows a clean label.
 function cleanModelName(raw: string): string {
 	return raw.replace(/\s*\(New\)\s*$/i, "");
 }
 
-function modelLabelFor(model: { name?: string; id?: string } | undefined): string {
+function modelLabelFor(
+	model: { name?: string; id?: string } | undefined,
+): string {
 	const raw = model?.name ?? model?.id ?? "model";
 	return cleanModelName(raw);
 }
@@ -88,7 +76,8 @@ function getEntries(ctx: ExtensionContext): readonly SessionEntry[] {
 }
 
 function requestRender(ctx: ExtensionContext): void {
-	const tui = (ctx.ui as unknown as { requestRender?: () => void }).requestRender;
+	const tui = (ctx.ui as unknown as { requestRender?: () => void })
+		.requestRender;
 	tui?.();
 }
 
@@ -119,15 +108,16 @@ export default function opencodeUi(pi: ExtensionAPI): void {
 		state = createState(ctx);
 		activeCtx = ctx;
 
-		ctx.ui.setEditorComponent((tui, theme, keybindings) =>
-			new ComposerEditor(
-				tui,
-				theme,
-				keybindings,
-				config,
-				ctx.ui.theme,
-				() => state ?? emptyState(),
-			),
+		ctx.ui.setEditorComponent(
+			(tui, theme, keybindings) =>
+				new ComposerEditor(
+					tui,
+					theme,
+					keybindings,
+					config,
+					ctx.ui.theme,
+					() => state ?? emptyState(),
+				),
 		);
 
 		ctx.ui.setFooter((_tui, _theme, footerData) => {
@@ -195,11 +185,9 @@ export default function opencodeUi(pi: ExtensionAPI): void {
 
 	pi.on("message_end", (event, ctx) => {
 		if (!state || event.message?.role !== "user") return;
-		state.lastMessage = contentToText(
-			(event.message as { content?: unknown } | undefined)?.content,
-		);
+		// The composer renders the message being typed live from the editor;
+		// on send there is nothing to keep — only refresh usage/cost.
 		refreshUsage(ctx);
-		requestRender(ctx);
 	});
 
 	pi.on("agent_end", (_event, ctx) => {
@@ -209,7 +197,6 @@ export default function opencodeUi(pi: ExtensionAPI): void {
 
 function emptyState(): ComposerState {
 	return {
-		lastMessage: undefined,
 		modelLabel: "model",
 		providerLabel: "",
 		thinkingLabel: undefined,

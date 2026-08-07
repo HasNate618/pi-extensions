@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import {
 	formatCount,
 	formatProviderLabel,
+	bgToFgEscape,
+	reapplyBackground,
 	thinkingTokenForLevel,
 	buildGauge,
 	ansiStrip,
@@ -25,6 +27,24 @@ test("formatProviderLabel title-cases", () => {
 	assert.equal(formatProviderLabel("opencode-go"), "Opencode Go");
 	assert.equal(formatProviderLabel("OpenCode Go"), "OpenCode Go");
 	assert.equal(formatProviderLabel(undefined), "Unknown");
+});
+
+test("bgToFgEscape rewrites a bg escape to fg", () => {
+	assert.equal(bgToFgEscape("\x1b[48;2;18;20;20m"), "\x1b[38;2;18;20;20m");
+	assert.equal(bgToFgEscape("\x1b[48;5;234m"), "\x1b[38;5;234m");
+	assert.equal(bgToFgEscape("\x1b[49m"), undefined);
+	assert.equal(bgToFgEscape(""), undefined);
+	assert.equal(bgToFgEscape("plain"), undefined);
+});
+
+test("reapplyBackground keeps a row solid across SGR resets", () => {
+	const bg = "\x1b[48;2;18;20;20m";
+	const text = "a\x1b[0mb\x1b[0mc";
+	assert.equal(
+		reapplyBackground(bg, text),
+		"a\x1b[0m" + bg + "b\x1b[0m" + bg + "c",
+	);
+	assert.equal(reapplyBackground(bg, "plain"), "plain");
 });
 
 test("thinkingTokenForLevel maps levels", () => {

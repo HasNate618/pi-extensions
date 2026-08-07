@@ -1,18 +1,25 @@
-export type OpenCodeUiMargins = { left: number; right: number; bottom: boolean };
+export type OpenCodeUiMargins = {
+	left: number;
+	right: number;
+	bottom: boolean;
+};
 
 export type OpenCodeUiConfig = {
+	// Composer box margins: left is the transparent rail gutter, right is the
+	// box's right gutter (both lie outside the fill).
 	margins: OpenCodeUiMargins;
+	// Footer bar insets (the footer has no box, just text insets).
+	footerMargins: { left: number; right: number };
 	railChar: string;
 	gaugeWidth: number;
-	showLastMessage: boolean;
 	showThinking: boolean;
 };
 
 export const DEFAULT_CONFIG: OpenCodeUiConfig = {
-	margins: { left: 1, right: 1, bottom: true },
+	margins: { left: 1, right: 2, bottom: true },
+	footerMargins: { left: 2, right: 2 },
 	railChar: "┃",
 	gaugeWidth: 13,
-	showLastMessage: true,
 	showThinking: true,
 };
 
@@ -22,15 +29,31 @@ const clamp = (value: number, min: number, max: number): number =>
 export function parseConfig(raw: unknown): OpenCodeUiConfig {
 	const source = (raw ?? {}) as Record<string, unknown>;
 	const margins = (source.margins ?? {}) as Record<string, unknown>;
+	const footerMargins = (source.footerMargins ?? {}) as Record<string, unknown>;
 	const config: OpenCodeUiConfig = {
 		margins: {
-			left: clamp(numberOr(margins.left, DEFAULT_CONFIG.margins.left), 0, 2),
-			right: clamp(numberOr(margins.right, DEFAULT_CONFIG.margins.right), 0, 2),
+			left: clamp(numberOr(margins.left, DEFAULT_CONFIG.margins.left), 0, 4),
+			right: clamp(numberOr(margins.right, DEFAULT_CONFIG.margins.right), 0, 4),
 			bottom: booleanOr(margins.bottom, DEFAULT_CONFIG.margins.bottom),
 		},
+		footerMargins: {
+			left: clamp(
+				numberOr(footerMargins.left, DEFAULT_CONFIG.footerMargins.left),
+				0,
+				4,
+			),
+			right: clamp(
+				numberOr(footerMargins.right, DEFAULT_CONFIG.footerMargins.right),
+				0,
+				4,
+			),
+		},
 		railChar: stringOr(source.railChar, DEFAULT_CONFIG.railChar),
-		gaugeWidth: clamp(numberOr(source.gaugeWidth, DEFAULT_CONFIG.gaugeWidth), 5, 40),
-		showLastMessage: booleanOr(source.showLastMessage, DEFAULT_CONFIG.showLastMessage),
+		gaugeWidth: clamp(
+			numberOr(source.gaugeWidth, DEFAULT_CONFIG.gaugeWidth),
+			5,
+			40,
+		),
 		showThinking: booleanOr(source.showThinking, DEFAULT_CONFIG.showThinking),
 	};
 	return config;

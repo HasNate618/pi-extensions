@@ -13,6 +13,23 @@ export function formatProviderLabel(provider: string | undefined): string {
 		.replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+// The palette's background tokens (e.g. userMessageBg) are not reachable
+// through theme.fg() — pi's Theme only registers bg-suffixed keys in its
+// bgColors map. Derive the matching foreground escape from a bg escape so
+// bar glyphs can reuse the same dark box color.
+export function bgToFgEscape(bgEscape: string): string | undefined {
+	const match = /^\x1b\[48;([0-9;]+)m/.exec(bgEscape);
+	return match ? `\x1b[38;${match[1]}m` : undefined;
+}
+
+// Re-apply a background escape after every SGR reset (\x1b[0m) so a row
+// stays solid even when its content resets styles mid-row — the editor's
+// cursor block ends with \x1b[0m, which would otherwise drop the box fill
+// for the rest of the row.
+export function reapplyBackground(bgEscape: string, text: string): string {
+	return text.replace(/\x1b\[0m/g, `\x1b[0m${bgEscape}`);
+}
+
 const THINKING_TOKENS: Record<string, string> = {
 	off: "thinkingOff",
 	minimal: "thinkingMinimal",

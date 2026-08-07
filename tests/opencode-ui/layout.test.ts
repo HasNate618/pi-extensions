@@ -15,7 +15,7 @@ const identity = (text: string): string => text;
 
 const config: OpenCodeUiConfig = DEFAULT_CONFIG;
 
-test("composer draws input, metadata at bottom, and indented bar", () => {
+test("composer draws the typed message as a padded box with metadata and bar", () => {
 	const lines = composeComposerLines({
 		width: 20,
 		contentLines: ["input"],
@@ -25,42 +25,43 @@ test("composer draws input, metadata at bottom, and indented bar", () => {
 		style: identity,
 		config,
 	});
-	assert.equal(lines.length, 3);
-	// input row first
-	assert.equal(lines[0], " ┃ input            ");
+	assert.equal(lines.length, 5);
+	// blank rail row above the typed message (left/right gutters transparent)
+	assert.equal(lines[0], " ┃" + " ".repeat(18));
+	// the typed message at rail + 1
+	assert.equal(lines[1], " ┃ input" + " ".repeat(12));
+	// blank rail row below the typed message
+	assert.equal(lines[2], " ┃" + " ".repeat(18));
 	// model · provider · thinking at the bottom, above the bar
-	assert.equal(lines[1], " ┃  M · P · high    ");
-	// bottom bar: 1-char indent; fill is spaces (identity style)
-	assert.equal(lines[2], " ╹" + " ".repeat(18));
+	assert.equal(lines[3], " ┃ M · P · high" + " ".repeat(5));
+	// bottom edge: half-height glyphs, 1-char indent, 2-char right gutter
+	assert.equal(lines[4], " ╹" + "▀".repeat(16) + "  ");
 });
 
-test("composer spaces the last message with blank rail rows", () => {
+test("composer wraps multi-line input with blank rail padding rows", () => {
 	const lines = composeComposerLines({
-		width: 20,
-		contentLines: ["input"],
-		lastMessage: "hello world",
+		width: 12,
+		contentLines: ["ab", "cd"],
 		modelLabel: "M",
 		providerLabel: "P",
 		style: identity,
 		config,
 	});
-	// blank rail above the message, message, blank rail below
-	assert.equal(lines[0], " ┃                  ");
-	assert.equal(lines[1], " ┃  hello world     ");
-	assert.equal(lines[2], " ┃                  ");
-	// input, then metadata at the bottom
-	assert.equal(lines[3], " ┃ input            ");
-	assert.equal(lines[4], " ┃  M · P           ");
-	assert.equal(lines[5], " ╹" + " ".repeat(18));
+	assert.equal(lines.length, 6);
+	assert.equal(lines[0], " ┃" + " ".repeat(10));
+	assert.equal(lines[1], " ┃ ab" + " ".repeat(7));
+	assert.equal(lines[2], " ┃ cd" + " ".repeat(7));
+	assert.equal(lines[3], " ┃" + " ".repeat(10));
+	assert.equal(lines[4], " ┃ M · P" + " ".repeat(4));
+	assert.equal(lines[5], " ╹" + "▀".repeat(8) + "  ");
 });
 
-test("composer last message truncates over-wide unbreakable lines", () => {
+test("composer truncates over-wide unbreakable content lines", () => {
 	// A pasted line wider than the terminal (e.g. a box border) must never
 	// overflow the row: pi hard-crashes on rendered width > terminal width.
 	const lines = composeComposerLines({
 		width: 20,
-		contentLines: ["input"],
-		lastMessage: "╹" + "▀".repeat(100),
+		contentLines: ["╹" + "▀".repeat(100)],
 		modelLabel: "M",
 		providerLabel: "P",
 		style: identity,
@@ -69,10 +70,9 @@ test("composer last message truncates over-wide unbreakable lines", () => {
 	for (const line of lines) {
 		assert.ok(
 			visibleWidth(line) <= 20,
-			`last-message row exceeds width: ${JSON.stringify(line)}`,
+			`composer row exceeds width: ${JSON.stringify(line)}`,
 		);
 	}
-	assert.ok((lines[0] ?? "").startsWith(" ┃  "));
 	assert.ok((lines[1] ?? "").includes("…"));
 });
 
@@ -85,27 +85,55 @@ test("composer omits thinking when undefined", () => {
 		style: identity,
 		config,
 	});
-	assert.equal(lines[0], " ┃ x                ");
-	assert.equal(lines[1], " ┃  M · P           ");
-	assert.equal(lines[2], " ╹" + " ".repeat(18));
+	assert.equal(lines[0], " ┃" + " ".repeat(18));
+	assert.equal(lines[1], " ┃ x" + " ".repeat(16));
+	assert.equal(lines[2], " ┃" + " ".repeat(18));
+	assert.equal(lines[3], " ┃ M · P" + " ".repeat(12));
+	assert.equal(lines[4], " ╹" + "▀".repeat(16) + "  ");
 });
 
-test("composer preserves input rows verbatim after the rail", () => {
-	const lines = composeComposerLines({
-		width: 12,
-		contentLines: ["ab", "cd"],
+test("composer wraps body rows in fill and the edge in bar", () => {
+	const calls: Array<[string, string]> = [];
+	const spy = (
+		text: string,
+		role: Parameters<typeof identity>[0] extends string ? string : never,
+	): string => {
+		calls.push([text, role]);
+		return text;
+	};
+	composeComposerLines({
+		width: 20,
+		contentLines: ["x"],
 		modelLabel: "M",
 		providerLabel: "P",
-		style: identity,
+		style: spy,
 		config,
 	});
-	assert.equal(lines[0], " ┃ ab       ");
-	assert.equal(lines[1], " ┃ cd       ");
-	assert.equal(lines[2], " ┃  M · P   ");
-	assert.equal(lines[3], " ╹" + " ".repeat(10));
+	const roles = calls.map(([, role]) => role);
+	// every body row (padding, message, metadata) is wrapped in "fill"; the
+	// edge uses "bar" for corner and glyphs (no fill on the bar row)
+	assert.ok(
+		roles.includes("fill"),
+		`expected fill role, got ${roles.join(",")}`,
+	);
+	assert.ok(roles.includes("bar"), `expected bar role, got ${roles.join(",")}`);
+	assert.ok(
+		roles.includes("rail"),
+		`expected rail role, got ${roles.join(",")}`,
+	);
+	assert.ok(
+		calls.some(([, r]) => r === "model"),
+		"metadata model role",
+	);
+	assert.ok(
+		calls.some(([, r]) => r === "muted"),
+		"metadata muted role",
+	);
+	// the bar row's left gutter is transparent (no fill on the margin)
+	assert.equal(calls.filter(([, r]) => r === "fill").length, 4);
 });
 
-test("composer with margins disabled has no left space", () => {
+test("composer with margins disabled has no gutters", () => {
 	const noMargin = {
 		...DEFAULT_CONFIG,
 		margins: { left: 0, right: 0, bottom: true },
@@ -118,9 +146,11 @@ test("composer with margins disabled has no left space", () => {
 		style: identity,
 		config: noMargin,
 	});
-	assert.equal(lines[0], "┃ x       ");
-	assert.equal(lines[1], "┃  M · P  ");
-	assert.equal(lines[2], "╹" + " ".repeat(9));
+	assert.equal(lines[0], "┃" + " ".repeat(9));
+	assert.equal(lines[1], "┃ x" + " ".repeat(7));
+	assert.equal(lines[2], "┃" + " ".repeat(9));
+	assert.equal(lines[3], "┃ M · P" + " ".repeat(3));
+	assert.equal(lines[4], "╹" + "▀".repeat(9));
 });
 
 test("footer aligns left and right segments with margins", () => {
@@ -136,8 +166,8 @@ test("footer aligns left and right segments with margins", () => {
 	assert.equal(lines.length, 2);
 	assert.equal(lines[1], "");
 	const line = lines[0] ?? "";
-	assert.ok(line.startsWith(" proj:main"));
-	assert.ok(line.endsWith("▰▰▰▰▱▱▱▱▱▱▱▱▱ 229k/1M · $0.005 "));
+	assert.ok(line.startsWith("  proj:main"));
+	assert.ok(line.endsWith("▰▰▰▰▱▱▱▱▱▱▱▱▱ 229k/1M · $0.005  "));
 	assert.equal(line.length, 45);
 });
 
@@ -151,7 +181,7 @@ test("footer without cost omits it", () => {
 		style: identity,
 		config,
 	});
-	assert.ok((lines[0] ?? "").endsWith("▰▱ 1k/2k "));
+	assert.ok((lines[0] ?? "").endsWith("▰▱ 1k/2k  "));
 });
 
 test("footer drops bottom blank row when margins.bottom is false", () => {
@@ -188,9 +218,9 @@ test("user message block wraps long content", () => {
 		style: identity,
 		config,
 	});
-	// contentMax = 12-1-1-1-2 = 7 → ["one two", "three", "four"] + 2 rail rows
-	assert.equal(lines.length, 5);
-	assert.ok((lines[1] ?? "").includes("one two"));
+	// contentMax = 12-1-2-1-2 = 6 → ["one", "two", "three", "four"] + 2 rail rows
+	assert.equal(lines.length, 6);
+	assert.ok((lines[1] ?? "").includes("one"));
 });
 
 test("user message block is idempotent for pre-wrapped lines", () => {

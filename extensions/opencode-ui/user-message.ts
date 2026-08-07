@@ -16,7 +16,8 @@ function installPrototypePatch(
 	patch: (receiver: Patchable, args: unknown[]) => unknown,
 ): () => void {
 	const own = Object.getOwnPropertyDescriptor(prototype, key);
-	if (!own || !("value" in own) || typeof own.value !== "function") return () => {};
+	if (!own || !("value" in own) || typeof own.value !== "function")
+		return () => {};
 	const previous = own.value;
 	Object.defineProperty(prototype, key, {
 		...own,
@@ -52,7 +53,9 @@ export function installUserMessagePatch(
 		RENDER_KEY,
 		(receiver, args) => {
 			const width = args[0];
-			const saved = (prototype as Record<string, unknown>)[`__oc_${RENDER_KEY}`];
+			const saved = (prototype as Record<string, unknown>)[
+				`__oc_${RENDER_KEY}`
+			];
 			if (typeof width !== "number") {
 				return typeof saved === "function"
 					? (saved as (...args: unknown[]) => string[]).call(receiver, ...args)

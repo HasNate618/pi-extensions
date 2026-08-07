@@ -3,21 +3,17 @@ export type OpenCodeUiMargins = { left: number; right: number; bottom: boolean }
 export type OpenCodeUiConfig = {
 	margins: OpenCodeUiMargins;
 	railChar: string;
-	barChar: string;
 	gaugeWidth: number;
 	showLastMessage: boolean;
 	showThinking: boolean;
-	newSessionBadge: boolean;
 };
 
 export const DEFAULT_CONFIG: OpenCodeUiConfig = {
 	margins: { left: 1, right: 1, bottom: true },
 	railChar: "┃",
-	barChar: "▀",
 	gaugeWidth: 13,
 	showLastMessage: true,
 	showThinking: true,
-	newSessionBadge: true,
 };
 
 const clamp = (value: number, min: number, max: number): number =>
@@ -33,11 +29,9 @@ export function parseConfig(raw: unknown): OpenCodeUiConfig {
 			bottom: booleanOr(margins.bottom, DEFAULT_CONFIG.margins.bottom),
 		},
 		railChar: stringOr(source.railChar, DEFAULT_CONFIG.railChar),
-		barChar: stringOr(source.barChar, DEFAULT_CONFIG.barChar),
 		gaugeWidth: clamp(numberOr(source.gaugeWidth, DEFAULT_CONFIG.gaugeWidth), 5, 40),
 		showLastMessage: booleanOr(source.showLastMessage, DEFAULT_CONFIG.showLastMessage),
 		showThinking: booleanOr(source.showThinking, DEFAULT_CONFIG.showThinking),
-		newSessionBadge: booleanOr(source.newSessionBadge, DEFAULT_CONFIG.newSessionBadge),
 	};
 	return config;
 }

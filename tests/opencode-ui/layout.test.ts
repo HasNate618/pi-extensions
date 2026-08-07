@@ -1,13 +1,21 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { DEFAULT_CONFIG, type OpenCodeUiConfig } from "../../extensions/opencode-ui/config.ts";
-import { composeComposerLines, composeFooterLines, composeUserMessageBlock } from "../../extensions/opencode-ui/layout.ts";
+import {
+	DEFAULT_CONFIG,
+	type OpenCodeUiConfig,
+} from "../../extensions/opencode-ui/config.ts";
+import {
+	composeComposerLines,
+	composeFooterLines,
+	composeUserMessageBlock,
+} from "../../extensions/opencode-ui/layout.ts";
+import { visibleWidth } from "../../extensions/opencode-ui/format.ts";
 
 const identity = (text: string): string => text;
 
 const config: OpenCodeUiConfig = DEFAULT_CONFIG;
 
-test("composer draws rail, metadata, input and bar with margins", () => {
+test("composer draws input, metadata at bottom, and indented bar", () => {
 	const lines = composeComposerLines({
 		width: 20,
 		contentLines: ["input"],
@@ -18,12 +26,15 @@ test("composer draws rail, metadata, input and bar with margins", () => {
 		config,
 	});
 	assert.equal(lines.length, 3);
-	assert.equal(lines[0], " ┃  M · P · high    ");
-	assert.equal(lines[1], " ┃ input            ");
-	assert.equal(lines[2], "╹" + "▀".repeat(19));
+	// input row first
+	assert.equal(lines[0], " ┃ input            ");
+	// model · provider · thinking at the bottom, above the bar
+	assert.equal(lines[1], " ┃  M · P · high    ");
+	// bottom bar: 1-char indent; fill is spaces (identity style)
+	assert.equal(lines[2], " ╹" + " ".repeat(18));
 });
 
-test("composer includes wrapped last message when provided", () => {
+test("composer spaces the last message with blank rail rows", () => {
 	const lines = composeComposerLines({
 		width: 20,
 		contentLines: ["input"],
@@ -33,10 +44,36 @@ test("composer includes wrapped last message when provided", () => {
 		style: identity,
 		config,
 	});
-	assert.equal(lines[0], " ┃  hello world     ");
-	assert.equal(lines[1], " ┃  M · P           ");
-	assert.equal(lines[2], " ┃ input            ");
-	assert.equal(lines[3], "╹" + "▀".repeat(19));
+	// blank rail above the message, message, blank rail below
+	assert.equal(lines[0], " ┃                  ");
+	assert.equal(lines[1], " ┃  hello world     ");
+	assert.equal(lines[2], " ┃                  ");
+	// input, then metadata at the bottom
+	assert.equal(lines[3], " ┃ input            ");
+	assert.equal(lines[4], " ┃  M · P           ");
+	assert.equal(lines[5], " ╹" + " ".repeat(18));
+});
+
+test("composer last message truncates over-wide unbreakable lines", () => {
+	// A pasted line wider than the terminal (e.g. a box border) must never
+	// overflow the row: pi hard-crashes on rendered width > terminal width.
+	const lines = composeComposerLines({
+		width: 20,
+		contentLines: ["input"],
+		lastMessage: "╹" + "▀".repeat(100),
+		modelLabel: "M",
+		providerLabel: "P",
+		style: identity,
+		config,
+	});
+	for (const line of lines) {
+		assert.ok(
+			visibleWidth(line) <= 20,
+			`last-message row exceeds width: ${JSON.stringify(line)}`,
+		);
+	}
+	assert.ok((lines[0] ?? "").startsWith(" ┃  "));
+	assert.ok((lines[1] ?? "").includes("…"));
 });
 
 test("composer omits thinking when undefined", () => {
@@ -48,7 +85,9 @@ test("composer omits thinking when undefined", () => {
 		style: identity,
 		config,
 	});
-	assert.equal(lines[0], " ┃  M · P           ");
+	assert.equal(lines[0], " ┃ x                ");
+	assert.equal(lines[1], " ┃  M · P           ");
+	assert.equal(lines[2], " ╹" + " ".repeat(18));
 });
 
 test("composer preserves input rows verbatim after the rail", () => {
@@ -60,12 +99,17 @@ test("composer preserves input rows verbatim after the rail", () => {
 		style: identity,
 		config,
 	});
-	assert.equal(lines[1], " ┃ ab       ");
-	assert.equal(lines[2], " ┃ cd       ");
+	assert.equal(lines[0], " ┃ ab       ");
+	assert.equal(lines[1], " ┃ cd       ");
+	assert.equal(lines[2], " ┃  M · P   ");
+	assert.equal(lines[3], " ╹" + " ".repeat(10));
 });
 
 test("composer with margins disabled has no left space", () => {
-	const noMargin = { ...DEFAULT_CONFIG, margins: { left: 0, right: 0, bottom: true } };
+	const noMargin = {
+		...DEFAULT_CONFIG,
+		margins: { left: 0, right: 0, bottom: true },
+	};
 	const lines = composeComposerLines({
 		width: 10,
 		contentLines: ["x"],
@@ -74,7 +118,9 @@ test("composer with margins disabled has no left space", () => {
 		style: identity,
 		config: noMargin,
 	});
-	assert.equal(lines[0], "┃  M · P  ");
+	assert.equal(lines[0], "┃ x       ");
+	assert.equal(lines[1], "┃  M · P  ");
+	assert.equal(lines[2], "╹" + " ".repeat(9));
 });
 
 test("footer aligns left and right segments with margins", () => {
@@ -109,7 +155,10 @@ test("footer without cost omits it", () => {
 });
 
 test("footer drops bottom blank row when margins.bottom is false", () => {
-	const noBottom = { ...DEFAULT_CONFIG, margins: { left: 1, right: 1, bottom: false } };
+	const noBottom = {
+		...DEFAULT_CONFIG,
+		margins: { left: 1, right: 1, bottom: false },
+	};
 	const lines = composeFooterLines({
 		width: 20,
 		left: "p:b",
@@ -158,4 +207,38 @@ test("user message block is idempotent for pre-wrapped lines", () => {
 		config,
 	});
 	assert.deepEqual(single, preWrapped);
+});
+
+test("user message block truncates over-wide unbreakable lines", () => {
+	const lines = composeUserMessageBlock({
+		width: 20,
+		lines: ["╹" + "▀".repeat(100)],
+		style: identity,
+		config,
+	});
+	for (const line of lines) {
+		assert.ok(
+			visibleWidth(line) <= 20,
+			`user-message row exceeds width: ${JSON.stringify(line)}`,
+		);
+	}
+	assert.ok((lines[1] ?? "").startsWith(" ┃  "));
+});
+
+test("footer never overflows narrow width", () => {
+	const lines = composeFooterLines({
+		width: 20,
+		left: "proj:main:some-branch",
+		contextLabel: "999.9k/999M",
+		gauge: "▰".repeat(13),
+		costLabel: "$9999.99",
+		style: identity,
+		config,
+	});
+	for (const line of lines) {
+		assert.ok(
+			visibleWidth(line) <= 20,
+			`footer row exceeds width: ${JSON.stringify(line)}`,
+		);
+	}
 });

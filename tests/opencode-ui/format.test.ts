@@ -92,7 +92,10 @@ test("visibleWidth treats escape sequences as zero width", () => {
 test("truncateToWidth never splits the cursor marker", () => {
 	const marker = "\x1b_pi:c\x07";
 	const result = truncateToWidth(marker + "abcdefgh", 4);
-	assert.ok(result.includes(marker), `marker must survive: ${JSON.stringify(result)}`);
+	assert.ok(
+		result.includes(marker),
+		`marker must survive: ${JSON.stringify(result)}`,
+	);
 	assert.equal(visibleWidth(result), 4);
 	assert.ok(result.endsWith("…"));
 });

@@ -16,20 +16,27 @@ export function parseEditorBorder(
 export function stripEditorFrame(
 	lines: string[],
 	_width: number,
+	paddingX = 0,
 ): { content: string[]; viewport: ViewportCounts } | undefined {
 	if (lines.length < 2) return undefined;
 	const top = parseEditorBorder(lines[0] ?? "", "above");
 	const bottom = parseEditorBorder(lines.at(-1) ?? "", "below");
 	if (!top || !bottom) return undefined;
 	const viewport: ViewportCounts = { above: top.count, below: bottom.count };
-	const interior = lines.slice(1, -1).map((line) => ansiStrip(line));
 	const content: string[] = [];
-	for (const line of interior) {
-		// Base editor content rows are "│ <text>" (optionally "│<text>"); drop the
-		// left glyph and a single following space. Defensive: leave rows that
-		// don't start with a side glyph untouched.
-		const match = /^[│┃▍] ?/.exec(line);
-		content.push(match ? line.slice(match[0].length).trimEnd() : line.trimEnd());
+	for (const line of lines.slice(1, -1)) {
+		let s = line;
+		// Drop the editor's side padding (paddingX spaces) and, defensively,
+		// any legacy side glyph ("│ <text>").
+		if (paddingX > 0 && s.startsWith(" ".repeat(paddingX))) {
+			s = s.slice(paddingX);
+		}
+		const glyph = /^[│┃▍] ?/.exec(s);
+		if (glyph) s = s.slice(glyph[0].length);
+		// Keep SGR (syntax colors, the reverse-video cursor block) and pi's
+		// cursor marker (\x1b_pi:c\x07) intact — only trim trailing padding
+		// spaces so the cursor stays visible in the composed row.
+		content.push(s.trimEnd());
 	}
 	return { content, viewport };
 }

@@ -24,6 +24,22 @@ test("stripEditorFrame strips top/bottom and side glyphs", () => {
 	assert.deepEqual(result.content, ["hello", "world"]);
 });
 
+test("stripEditorFrame drops paddingX spaces and preserves SGR + cursor marker", () => {
+	const marker = "\x1b_pi:c\x07";
+	const reverseCursor = "\x1b[7m \x1b[0m";
+	const sgr = "\x1b[38;2;1;2;3m";
+	const lines = [
+		"─".repeat(12),
+		`  ${sgr}abc${reverseCursor}${marker}  `,
+		"─".repeat(12),
+	];
+	const result = stripEditorFrame(lines, 12, 2);
+	assert.ok(result);
+	// The 2-space side padding is stripped, but SGR colors, the reverse-video
+	// cursor block, and pi's cursor marker all survive.
+	assert.equal(result.content[0], `${sgr}abc${reverseCursor}${marker}`);
+});
+
 test("stripEditorFrame returns undefined for malformed input", () => {
 	assert.equal(stripEditorFrame(["a", "b"], 12), undefined);
 	assert.equal(stripEditorFrame(["─".repeat(12), "│ x ", "not-a-border"], 12), undefined);

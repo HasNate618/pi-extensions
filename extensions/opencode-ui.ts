@@ -33,7 +33,6 @@ type SessionState = {
 	modelLabel: string;
 	providerLabel: string;
 	thinkingLabel: string | undefined;
-	isNewSession: boolean;
 	usageFingerprint: string;
 	cost: number;
 };
@@ -49,10 +48,9 @@ function createState(ctx: ExtensionContext): SessionState {
 	const totals = computeUsageTotals(entries);
 	return {
 		lastMessage,
-		modelLabel: model?.name ?? model?.id ?? "model",
+		modelLabel: modelLabelFor(model),
 		providerLabel: formatProviderLabel(model?.provider),
 		thinkingLabel: undefined,
-		isNewSession: lastUser === undefined,
 		usageFingerprint: computeUsageFingerprint(entries),
 		cost: totals.cost,
 	};
@@ -66,6 +64,17 @@ function contentToText(content: unknown): string | undefined {
 			.join("");
 	}
 	return undefined;
+}
+
+// Some model catalogs (e.g. opencode-go) mark new models with a "(New)"
+// suffix in their display name; strip it so the composer shows a clean label.
+function cleanModelName(raw: string): string {
+	return raw.replace(/\s*\(New\)\s*$/i, "");
+}
+
+function modelLabelFor(model: { name?: string; id?: string } | undefined): string {
+	const raw = model?.name ?? model?.id ?? "model";
+	return cleanModelName(raw);
 }
 
 function getEntries(ctx: ExtensionContext): readonly SessionEntry[] {
@@ -122,6 +131,11 @@ export default function opencodeUi(pi: ExtensionAPI): void {
 		);
 
 		ctx.ui.setFooter((_tui, _theme, footerData) => {
+			const fd = footerData as {
+				cwd?: string;
+				getGitBranch?: () => string | undefined;
+				onBranchChange?: (cb: () => void) => () => void;
+			};
 			const getData = (): FooterRenderData => {
 				const usage = ctx.getContextUsage() as
 					| { tokens?: number | null; contextWindow?: number }
@@ -133,17 +147,17 @@ export default function opencodeUi(pi: ExtensionAPI): void {
 				};
 			};
 			const leftLabel = (): string => {
-				const branch = footerData.getGitBranch();
-				const project = basename(footerData.cwd ?? "");
+				const branch = fd.getGitBranch?.();
+				const project = basename(fd.cwd ?? "");
 				const b = branch ?? "";
 				return b ? `${project}:${b}` : project;
 			};
-			const subscribe = (
-				footerData as { onBranchChange?: (cb: () => void) => () => void }
-			).onBranchChange;
 			offBranchChange?.();
+			// Call as a method so `this` stays bound to the provider (extracting
+			// it first would throw "this.branchChangeCallbacks is undefined" and
+			// leave pi without any footer).
 			offBranchChange =
-				subscribe?.(() => {
+				fd.onBranchChange?.(() => {
 					if (activeCtx !== ctx) return;
 					requestRender(ctx);
 				}) ?? null;
@@ -166,7 +180,9 @@ export default function opencodeUi(pi: ExtensionAPI): void {
 
 	pi.on("model_select", (event, ctx) => {
 		if (!state) return;
-		state.modelLabel = event.model?.name ?? event.model?.id ?? "model";
+		state.modelLabel = modelLabelFor(
+			event.model as { name?: string; id?: string } | undefined,
+		);
 		state.providerLabel = formatProviderLabel(event.model?.provider);
 		requestRender(ctx);
 	});
@@ -182,7 +198,6 @@ export default function opencodeUi(pi: ExtensionAPI): void {
 		state.lastMessage = contentToText(
 			(event.message as { content?: unknown } | undefined)?.content,
 		);
-		state.isNewSession = false;
 		refreshUsage(ctx);
 		requestRender(ctx);
 	});
@@ -198,7 +213,6 @@ function emptyState(): ComposerState {
 		modelLabel: "model",
 		providerLabel: "",
 		thinkingLabel: undefined,
-		isNewSession: true,
 	};
 }
 

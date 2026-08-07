@@ -15,7 +15,6 @@ export type ComposerState = {
 	modelLabel: string;
 	providerLabel: string;
 	thinkingLabel: string | undefined;
-	isNewSession: boolean;
 };
 
 export class ComposerEditor extends CustomEditor {
@@ -42,7 +41,20 @@ export class ComposerEditor extends CustomEditor {
 			case "rail":
 				return this.uiTheme.fg("border", text);
 			case "bar":
-				return this.uiTheme.fg("accent", text);
+				// Bottom-bar corner: subtle border color from the active theme.
+				return this.uiTheme.fg("border", text);
+			case "barFill": {
+				// Solid dark fill for the bottom box edge (opencode renders it as
+				// a background row). If the theme has no usable background token,
+				// drop the fill entirely, leaving just the corner.
+				let fill: string;
+				try {
+					fill = this.uiTheme.bg("userMessageBg", text);
+				} catch {
+					fill = "";
+				}
+				return fill;
+			}
 			case "model":
 				return this.uiTheme.fg("accent", text);
 			case "muted":
@@ -57,10 +69,15 @@ export class ComposerEditor extends CustomEditor {
 	};
 
 	override render(width: number): string[] {
-		const inner = Math.max(0, width - this.config.margins.left - this.config.margins.right);
+		const inner = Math.max(
+			0,
+			width - this.config.margins.left - this.config.margins.right,
+		);
 		if (inner <= 4) return super.render(width);
 		const base = super.render(inner);
-		const stripped = stripEditorFrame(base, inner);
+		// Pass the editor's own paddingX so the frame strip removes the side
+		// padding without touching SGR codes or the cursor marker.
+		const stripped = stripEditorFrame(base, inner, this.paddingX);
 		const contentLines = stripped ? stripped.content : base;
 		const state = this.getState();
 		return composeComposerLines({
@@ -70,8 +87,6 @@ export class ComposerEditor extends CustomEditor {
 			modelLabel: state.modelLabel,
 			providerLabel: state.providerLabel,
 			thinkingLabel: this.config.showThinking ? state.thinkingLabel : undefined,
-			showNewSessionBadge:
-				this.config.newSessionBadge && state.isNewSession ? true : undefined,
 			style: this.styleRole,
 			config: this.config,
 		});

@@ -34,12 +34,14 @@ export function buildGauge(percent: number, width: number): string {
 }
 
 export function ansiStrip(text: string): string {
-	return text
-		.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "")
-		.replace(/\x1b\][^\x07]*(?:\x07|\x1b\\)/g, "")
-		// DCS (\x1bP…\x1b\) and APC (\x1b_…\x1b\) or \x1b_…\x07, e.g. pi's
-		// cursor marker \x1b_pi:c\x07) — either ST or BEL terminates.
-		.replace(/\x1b[P_][\s\S]*?(?:\x1b\\|\x07)/g, "");
+	return (
+		text
+			.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "")
+			.replace(/\x1b\][^\x07]*(?:\x07|\x1b\\)/g, "")
+			// DCS (\x1bP…\x1b\) and APC (\x1b_…\x1b\) or \x1b_…\x07, e.g. pi's
+			// cursor marker \x1b_pi:c\x07) — either ST or BEL terminates.
+			.replace(/\x1b[P_][\s\S]*?(?:\x1b\\|\x07)/g, "")
+	);
 }
 
 export function visibleWidth(text: string): number {
@@ -48,7 +50,8 @@ export function visibleWidth(text: string): number {
 		const code = ch.codePointAt(0) ?? 0;
 		const wide =
 			(code >= 0x1100 && code <= 0x115f) ||
-			code === 0x2329 || code === 0x232a ||
+			code === 0x2329 ||
+			code === 0x232a ||
 			(code >= 0x2e80 && code <= 0xa4cf && code !== 0x303f) ||
 			(code >= 0xac00 && code <= 0xd7a3) ||
 			(code >= 0xf900 && code <= 0xfaff) ||
@@ -94,7 +97,11 @@ function escapeSequenceLength(text: string, index: number): number {
 	return 1;
 }
 
-export function truncateToWidth(text: string, width: number, ellipsis = "…"): string {
+export function truncateToWidth(
+	text: string,
+	width: number,
+	ellipsis = "…",
+): string {
 	if (visibleWidth(text) <= width) return text;
 	let out = "";
 	let w = 0;
@@ -138,7 +145,10 @@ export function wrapText(text: string, width: number): string[] {
 		}
 		lines.push(line);
 	}
-	return lines.filter((line, index) => line.length > 0 || index === lines.length - 1 || lines.length === 1);
+	return lines.filter(
+		(line, index) =>
+			line.length > 0 || index === lines.length - 1 || lines.length === 1,
+	);
 }
 
 export function formatContextLabel(

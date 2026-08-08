@@ -142,6 +142,12 @@ export default function opencodeUi(pi: ExtensionAPI): void {
 		offAssistantPatch = installAssistantMessagePatch(() => config);
 		offToolCardPatch?.();
 		offToolCardPatch = installToolCardPatch(() => config);
+		// The built-in "Working..." status spinner ignores the chat margins
+		// and stacks a second static row next to the thinking indicator while
+		// a reply streams — hide it (the thinking indicator is separate and
+		// stays).
+		(ctx.ui as { setWorkingVisible?: (visible: boolean) => void })
+			.setWorkingVisible?.(false);
 		state = createState(ctx);
 		activeCtx = ctx;
 

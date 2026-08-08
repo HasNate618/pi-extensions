@@ -25,14 +25,20 @@ export type UsageTotals = {
 const normalize = (value: unknown): number =>
 	typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : 0;
 
-export function computeUsageTotals(entries: readonly SessionEntry[]): UsageTotals {
+export function computeUsageTotals(
+	entries: readonly SessionEntry[],
+): UsageTotals {
 	let input = 0;
 	let output = 0;
 	let cacheRead = 0;
 	let cacheWrite = 0;
 	let cost = 0;
 	for (const entry of entries) {
-		if (entry.type === "message" && entry.message?.role !== "assistant" && entry.message?.role !== "toolResult") {
+		if (
+			entry.type === "message" &&
+			entry.message?.role !== "assistant" &&
+			entry.message?.role !== "toolResult"
+		) {
 			continue;
 		}
 		const usage = entry.message?.usage ?? entry.usage;
@@ -46,7 +52,9 @@ export function computeUsageTotals(entries: readonly SessionEntry[]): UsageTotal
 	return { input, output, cacheRead, cacheWrite, cost };
 }
 
-export function computeUsageFingerprint(entries: readonly SessionEntry[]): string {
+export function computeUsageFingerprint(
+	entries: readonly SessionEntry[],
+): string {
 	return entries
 		.map((entry) =>
 			JSON.stringify([

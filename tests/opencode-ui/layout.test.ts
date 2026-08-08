@@ -168,9 +168,7 @@ test("footer aligns left and right segments with margins", () => {
 	assert.equal(lines[1], "");
 	const line = lines[0] ?? "";
 	assert.ok(line.startsWith("   proj:ma…"));
-	assert.ok(
-		line.endsWith("▰▰▰▰▱▱▱▱▱▱▱▱▱ 229k/1M · $0.005   "),
-	);
+	assert.ok(line.endsWith("▰▰▰▰▱▱▱▱▱▱▱▱▱ 229k/1M · $0.005   "));
 	assert.equal(line.length, 45);
 });
 

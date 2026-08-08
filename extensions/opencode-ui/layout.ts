@@ -1,5 +1,5 @@
 import type { OpenCodeUiConfig } from "./config.ts";
-import { composerMargins } from "./config.ts";
+import { composerBoxMargins, composerMargins } from "./config.ts";
 import { padTo, truncateToWidth, visibleWidth, wrapText } from "./format.ts";
 
 export type Styler = (
@@ -19,8 +19,8 @@ export type ComposerLayoutOptions = {
 
 export function composeComposerLines(options: ComposerLayoutOptions): string[] {
 	const { width, contentLines, style, config } = options;
-	const mLeft = composerMargins(config).left;
-	const mRight = composerMargins(config).right;
+	const mLeft = composerBoxMargins(config).left;
+	const mRight = composerBoxMargins(config).right;
 	const rail = style(config.railChar, "rail");
 	// Text budget: the box spans (rail + 1)..width-mRight; the 2-space
 	// indent sits inside it (matches the editor's own wrap width).
@@ -82,6 +82,10 @@ export type FooterLayoutOptions = {
 	gauge: string;
 	costLabel: string;
 	cacheHitLabel: string;
+	// Extension status chips (e.g. prefix-keys' "prefix ⌗ …" labels), sorted
+	// by key — rendered as an extra footer line below the stats, like pi's
+	// built-in footer.
+	statuses: string[];
 	style: Styler;
 	config: OpenCodeUiConfig;
 };
@@ -94,6 +98,7 @@ export function composeFooterLines(options: FooterLayoutOptions): string[] {
 		gauge,
 		costLabel,
 		cacheHitLabel,
+		statuses,
 		style,
 		config,
 	} = options;
@@ -109,9 +114,15 @@ export function composeFooterLines(options: FooterLayoutOptions): string[] {
 	]
 		.filter(Boolean)
 		.join("");
+	const rightBudget = Math.max(0, contentWidth - 4);
+	// On narrow terminals the context gauge can't fit alongside the labels;
+	// dropping it beats rendering a partially-truncated gauge.
+	const labelsWidth = visibleWidth(style(rightParts, "muted"));
+	const gaugeFits =
+		gauge === "" || visibleWidth(gauge) + 1 + labelsWidth <= rightBudget;
 	const rightText = truncateToWidth(
-		(gauge ? `${gauge} ` : "") + style(rightParts, "muted"),
-		Math.max(0, contentWidth - 4),
+		(gauge && gaugeFits ? `${gauge} ` : "") + style(rightParts, "muted"),
+		rightBudget,
 	);
 	const rightWidth = visibleWidth(rightText);
 	const leftText = truncateToWidth(
@@ -132,6 +143,18 @@ export function composeFooterLines(options: FooterLayoutOptions): string[] {
 				]
 			: [" ".repeat(width)];
 	if (composerMargins(config).bottom) rows.push("");
+	if (statuses.length > 0) {
+		// Same shape as pi's built-in footer status line: chips joined with a
+		// space, truncated to the content width with the footer gutters.
+		rows.push(
+			" ".repeat(mLeft) +
+				truncateToWidth(
+					style(statuses.join(" "), "muted"),
+					Math.max(0, contentWidth),
+				) +
+				" ".repeat(Math.max(0, mRight)),
+		);
+	}
 	return rows;
 }
 
@@ -146,8 +169,10 @@ export function composeUserMessageBlock(
 	options: UserMessageLayoutOptions,
 ): string[] {
 	const { width, lines, style, config } = options;
-	const mLeft = composerMargins(config).left;
-	const mRight = composerMargins(config).right;
+	// Same box as the composer: 2-cell left gutter, chatMargins.right on the
+	// right. An explicit `margins` config override still wins for both.
+	const mLeft = composerBoxMargins(config).left;
+	const mRight = composerBoxMargins(config).right;
 	const rail = style(config.railChar, "rail");
 	const contentMax = Math.max(1, width - mLeft - mRight - 1 - 2);
 	// Mirrors the composer: a solid dark box with a rail (outside the

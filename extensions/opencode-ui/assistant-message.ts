@@ -5,7 +5,12 @@
 // both sides.
 import { AssistantMessageComponent } from "@earendil-works/pi-coding-agent";
 import type { OpenCodeUiConfig } from "./config.ts";
-import { insetRenderWidth, insetRenderedLines } from "./assistant-layout.ts";
+import {
+	dropLeadingBlankRows,
+	insetRenderWidth,
+	insetRenderedLines,
+	isThinkingOnlyMessage,
+} from "./assistant-layout.ts";
 import { installPrototypePatch } from "./patch.ts";
 
 const PATCH_KEY = "opencode-ui-assistant-message-render";
@@ -39,12 +44,32 @@ export function installAssistantMessagePatch(
 							insetRenderWidth(width, left, right),
 						)
 					: [];
-			return insetRenderedLines(
+			let lines = insetRenderedLines(
 				Array.isArray(base) ? base : [],
 				width,
 				left,
 				right,
 			);
+			// pi's streaming "Thinking..." indicator is an assistant message
+			// whose only visible content is a hidden thinking block; its render
+			// is a Spacer row + the label. Drop the spacer so no blank line
+			// precedes "Thinking...".
+			const content =
+				(
+					receiver as {
+						lastMessage?: {
+							content?: Array<{
+								type?: string;
+								text?: string;
+								thinking?: string;
+							}>;
+						};
+					}
+				).lastMessage?.content ?? [];
+			if (isThinkingOnlyMessage(content)) {
+				lines = dropLeadingBlankRows(lines);
+			}
+			return lines;
 		},
 	);
 }

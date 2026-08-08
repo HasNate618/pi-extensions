@@ -1,7 +1,7 @@
 // Pure layout helpers for the assistant-message inset patch. Kept free of
 // pi imports so the tests can run them directly.
 
-import { truncateToWidth, visibleWidth } from "./format.ts";
+import { ansiStrip, truncateToWidth, visibleWidth } from "./format.ts";
 
 // pi's OSC 133 shell-integration zones: added by the native render to the
 // first (prompt start) and last (prompt end + final) lines of the message.
@@ -40,6 +40,47 @@ export function insetToolLines(
 			" ".repeat(right)
 		);
 	});
+}
+
+// pi adds a Spacer row above any assistant message with visible content. For
+// the streaming thinking-only message (hidden thinking block → "Thinking...")
+// that spacer renders as a stray blank line that reads like an empty message.
+// Drop leading rows whose visible content is only spaces so the label sits
+// directly under the previous message.
+export function dropLeadingBlankRows(lines: string[]): string[] {
+	let start = 0;
+	while (start < lines.length && ansiStrip(lines[start] ?? "").trim() === "") {
+		start++;
+	}
+	return lines.slice(start);
+}
+
+type ThinkingBlock = {
+	type?: string;
+	text?: string;
+	thinking?: string;
+};
+
+// True when the message's only visible content is a thinking block (pi hides
+// it behind the "Thinking..." label) — the case where the stray spacer line
+// must not be drawn.
+export function isThinkingOnlyMessage(
+	content: readonly ThinkingBlock[],
+): boolean {
+	const hasThinking = content.some(
+		(block) =>
+			block.type === "thinking" &&
+			typeof block.thinking === "string" &&
+			block.thinking.trim() !== "",
+	);
+	const hasOtherVisibleContent = content.some(
+		(block) =>
+			(block.type === "text" &&
+				typeof block.text === "string" &&
+				block.text.trim() !== "") ||
+			block.type === "toolCall",
+	);
+	return hasThinking && !hasOtherVisibleContent;
 }
 
 // Re-lays out pi's base render (already produced at insetRenderWidth) inside

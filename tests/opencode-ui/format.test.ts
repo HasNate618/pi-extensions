@@ -132,6 +132,54 @@ test("visibleWidth counts wide chars as 2", () => {
 	assert.equal(visibleWidth("中"), 2);
 });
 
+test("visibleWidth matches pi's emoji accounting (crash parity)", () => {
+	// pi counts RGI emoji as 2 cells; the old code counted ✅ as 1, which
+	// padded rows one cell too wide and crashed pi ("172 > 171").
+	assert.equal(visibleWidth("✅"), 2);
+	assert.equal(visibleWidth("📜"), 2);
+	assert.equal(visibleWidth("The over-wide line contains ✅"), 30);
+	// text-presentation variants stay 1 unless a variation selector follows
+	assert.equal(visibleWidth("⚠"), 1);
+	assert.equal(visibleWidth("⚠️"), 2);
+	assert.equal(visibleWidth("☀️"), 2);
+	// keycap sequence counts as one 2-cell glyph
+	assert.equal(visibleWidth("1️⃣"), 2);
+	// flags are one grapheme, 2 cells (same as pi)
+	assert.equal(visibleWidth("🇺🇸"), 2);
+});
+
+test("visibleWidth matches pi's east-asian-width table (crash parity)", () => {
+	// ☰ (U+2630) is WIDE in get-east-asian-width (the table pi uses); the old
+	// hand-rolled ranges counted it 1, undercounting the row by one cell and
+	// crashing pi ("249 > 248"). The extension now embeds the same table.
+	assert.equal(visibleWidth("☰"), 2);
+	assert.equal(visibleWidth("©"), 1);
+	assert.equal(visibleWidth("♠"), 1);
+	assert.equal(visibleWidth("→"), 1);
+	assert.equal(visibleWidth("—"), 1);
+	const line =
+		"The characters: © (U+00A9), ☰ (U+2630), ♠ (U+2660), → (U+2192), — (U+2014).";
+	assert.equal(visibleWidth(line), 76);
+});
+
+test("visibleWidth treats combining marks and selectors as zero width", () => {
+	assert.equal(visibleWidth("e\u0301"), 1); // e + combining acute
+	assert.equal(visibleWidth("a\uFE0F"), 1); // VS16 alone carries no width
+});
+
+test("padTo accounts for emoji width so rows land on target", () => {
+	// 2-cell emoji + 1 ASCII char = 3 cells; pad to 5 leaves 2 cells.
+	assert.equal(ansiStrip(padTo("✅x", 5)), "✅x  ");
+});
+
+test("truncateToWidth never splits a surrogate pair", () => {
+	const out = truncateToWidth("✅✅✅", 5);
+	assert.equal(visibleWidth(out), 5);
+	assert.ok(out.startsWith("✅✅"));
+	assert.ok(out.endsWith("…"));
+	assert.ok(!/\uD83C/.test(out), "no lone surrogate left behind");
+});
+
 test("padTo pads to target width", () => {
 	assert.equal(padTo("ab", 4), "ab  ");
 });
@@ -182,10 +230,10 @@ test("truncateToWidth never splits the cursor marker", () => {
 });
 
 test("formatCacheHitRate reports cached share of read input", () => {
-	assert.equal(formatCacheHitRate(60, 40), "cache 60%");
-	assert.equal(formatCacheHitRate(0, 100), "cache 0%");
-	assert.equal(formatCacheHitRate(100, 0), "cache 100%");
+	assert.equal(formatCacheHitRate(60, 40), "󱘥 60%");
+	assert.equal(formatCacheHitRate(0, 100), "󱘥 0%");
+	assert.equal(formatCacheHitRate(100, 0), "󱘥 100%");
 	assert.equal(formatCacheHitRate(0, 0), "");
-	assert.equal(formatCacheHitRate(25, 25), "cache 50%");
-	assert.equal(formatCacheHitRate(-5, 10), "cache 0%");
+	assert.equal(formatCacheHitRate(25, 25), "󱘥 50%");
+	assert.equal(formatCacheHitRate(-5, 10), "󱘥 0%");
 });

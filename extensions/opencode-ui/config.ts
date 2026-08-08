@@ -95,10 +95,26 @@ export function parseConfig(raw: unknown): OpenCodeUiConfig {
 	return config;
 }
 
-// Effective margins for the composer and user-message boxes: the explicit
-// `margins` alias wins when set, otherwise the global chatMargins apply.
+// Effective margins for the composer and user-message boxes (they share the
+// same visual box): the explicit `margins` alias wins when set, otherwise
+// the boxes sit one cell closer to the sidebar than the chat body — a
+// 2-cell left gutter, with the right side following chatMargins.
 export function composerMargins(config: OpenCodeUiConfig): OpenCodeUiMargins {
-	return config.margins ?? { ...config.chatMargins, bottom: true };
+	return (
+		config.margins ?? {
+			left: 2,
+			right: config.chatMargins.right,
+			bottom: true,
+		}
+	);
+}
+
+// Alias kept for call sites that want to be explicit about the box margins
+// (composer + user messages) vs the chat body's chatMargins.
+export function composerBoxMargins(
+	config: OpenCodeUiConfig,
+): OpenCodeUiMargins {
+	return composerMargins(config);
 }
 
 function numberOr(value: unknown, fallback: number): number {

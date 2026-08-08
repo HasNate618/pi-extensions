@@ -9,7 +9,10 @@ import {
 	composeFooterLines,
 	composeUserMessageBlock,
 } from "../../extensions/opencode-ui/layout.ts";
-import { visibleWidth } from "../../extensions/opencode-ui/format.ts";
+import {
+	ansiStrip,
+	visibleWidth,
+} from "../../extensions/opencode-ui/format.ts";
 
 const identity = (text: string): string => text;
 
@@ -27,15 +30,15 @@ test("composer draws the typed message as a padded box with metadata and bar", (
 	});
 	assert.equal(lines.length, 5);
 	// blank rail row above the typed message (left/right gutters transparent)
-	assert.equal(lines[0], "   ┃" + " ".repeat(16));
+	assert.equal(lines[0], "  ┃" + " ".repeat(17));
 	// the typed message at rail + 2
-	assert.equal(lines[1], "   ┃  input" + " ".repeat(9));
+	assert.equal(lines[1], "  ┃  input" + " ".repeat(10));
 	// blank rail row below the typed message
-	assert.equal(lines[2], "   ┃" + " ".repeat(16));
+	assert.equal(lines[2], "  ┃" + " ".repeat(17));
 	// model · provider · thinking at the bottom, above the bar
-	assert.equal(lines[3], "   ┃  M · P · hi…" + " ".repeat(3));
-	// bottom edge: half-height glyphs, 3-char indent, 3-char right gutter
-	assert.equal(lines[4], "   ╹" + "▀".repeat(13) + "   ");
+	assert.equal(lines[3], "  ┃  M · P · high" + " ".repeat(3));
+	// bottom edge: half-height glyphs, 2-char indent, 3-char right gutter
+	assert.equal(lines[4], "  ╹" + "▀".repeat(14) + "   ");
 });
 
 test("composer wraps multi-line input with blank rail padding rows", () => {
@@ -48,12 +51,12 @@ test("composer wraps multi-line input with blank rail padding rows", () => {
 		config,
 	});
 	assert.equal(lines.length, 6);
-	assert.equal(lines[0], "   ┃" + " ".repeat(12));
-	assert.equal(lines[1], "   ┃  ab" + " ".repeat(8));
-	assert.equal(lines[2], "   ┃  cd" + " ".repeat(8));
-	assert.equal(lines[3], "   ┃" + " ".repeat(12));
-	assert.equal(lines[4], "   ┃  M · P" + " ".repeat(5));
-	assert.equal(lines[5], "   ╹" + "▀".repeat(9) + "   ");
+	assert.equal(lines[0], "  ┃" + " ".repeat(13));
+	assert.equal(lines[1], "  ┃  ab" + " ".repeat(9));
+	assert.equal(lines[2], "  ┃  cd" + " ".repeat(9));
+	assert.equal(lines[3], "  ┃" + " ".repeat(13));
+	assert.equal(lines[4], "  ┃  M · P" + " ".repeat(6));
+	assert.equal(lines[5], "  ╹" + "▀".repeat(10) + "   ");
 });
 
 test("composer truncates over-wide unbreakable content lines", () => {
@@ -85,11 +88,11 @@ test("composer omits thinking when undefined", () => {
 		style: identity,
 		config,
 	});
-	assert.equal(lines[0], "   ┃" + " ".repeat(16));
-	assert.equal(lines[1], "   ┃  x" + " ".repeat(13));
-	assert.equal(lines[2], "   ┃" + " ".repeat(16));
-	assert.equal(lines[3], "   ┃  M · P" + " ".repeat(9));
-	assert.equal(lines[4], "   ╹" + "▀".repeat(13) + "   ");
+	assert.equal(lines[0], "  ┃" + " ".repeat(17));
+	assert.equal(lines[1], "  ┃  x" + " ".repeat(14));
+	assert.equal(lines[2], "  ┃" + " ".repeat(17));
+	assert.equal(lines[3], "  ┃  M · P" + " ".repeat(10));
+	assert.equal(lines[4], "  ╹" + "▀".repeat(14) + "   ");
 });
 
 test("composer wraps body rows in fill and the edge in bar", () => {
@@ -154,6 +157,48 @@ test("composer with margins disabled has no gutters", () => {
 	assert.equal(lines[4], "╹" + "▀".repeat(9));
 });
 
+test("composer and user messages share the 2-cell left gutter", () => {
+	const comp = composeComposerLines({
+		width: 20,
+		contentLines: ["x"],
+		modelLabel: "M",
+		providerLabel: "P",
+		style: identity,
+		config,
+	});
+	assert.ok((comp[1] ?? "").startsWith("  ┃  x"), "composer rail at col 2");
+	// right gutter stays chatMargins.right (3)
+	assert.equal((comp[4] ?? "").slice(-3), "   ");
+	const um = composeUserMessageBlock({
+		width: 20,
+		lines: ["x"],
+		style: identity,
+		config,
+	});
+	assert.ok((um[1] ?? "").startsWith("  ┃  x"), "user message rail at col 2");
+	// an explicit margins override still wins for both
+	const custom = {
+		...DEFAULT_CONFIG,
+		margins: { left: 1, right: 3, bottom: true },
+	};
+	const compCustom = composeComposerLines({
+		width: 20,
+		contentLines: ["x"],
+		modelLabel: "M",
+		providerLabel: "P",
+		style: identity,
+		config: custom,
+	});
+	assert.ok((compCustom[1] ?? "").startsWith(" ┃  x"));
+	const umCustom = composeUserMessageBlock({
+		width: 20,
+		lines: ["x"],
+		style: identity,
+		config: custom,
+	});
+	assert.ok((umCustom[1] ?? "").startsWith(" ┃  x"));
+});
+
 test("footer aligns left and right segments with margins", () => {
 	const lines = composeFooterLines({
 		width: 45,
@@ -161,6 +206,7 @@ test("footer aligns left and right segments with margins", () => {
 		contextLabel: "229k/1M",
 		gauge: "▰▰▰▰▱▱▱▱▱▱▱▱▱",
 		costLabel: "$0.005",
+		statuses: [],
 		style: identity,
 		config,
 	});
@@ -179,10 +225,30 @@ test("footer without cost omits it", () => {
 		contextLabel: "1k/2k",
 		gauge: "▰▱",
 		costLabel: "",
+		statuses: [],
 		style: identity,
 		config,
 	});
 	assert.ok((lines[0] ?? "").endsWith("▰▱ 1k/2k   "));
+});
+
+test("footer renders extension status chips on their own line", () => {
+	const lines = composeFooterLines({
+		width: 45,
+		left: "proj:main",
+		contextLabel: "1k/2k",
+		gauge: "▰▱",
+		costLabel: "",
+		statuses: ["prefix ⌗ (ctrl+x)", "prefix ⌗ m → /model"],
+		style: identity,
+		config,
+	});
+	// stats line + blank row + status line
+	assert.equal(lines.length, 3);
+	assert.ok((lines[2] ?? "").includes("prefix ⌗ (ctrl+x)"));
+	assert.ok((lines[2] ?? "").includes("m → /model"));
+	assert.ok((lines[2] ?? "").startsWith("   prefix ⌗"));
+	for (const line of lines) assert.ok(visibleWidth(line) <= 45);
 });
 
 test("footer drops bottom blank row when margins.bottom is false", () => {
@@ -196,6 +262,7 @@ test("footer drops bottom blank row when margins.bottom is false", () => {
 		contextLabel: "1k/2k",
 		gauge: "▰▱",
 		costLabel: "",
+		statuses: [],
 		style: identity,
 		config: noBottom,
 	});
@@ -209,10 +276,11 @@ test("user message block draws rail around content", () => {
 		style: identity,
 		config,
 	});
+	// same 2-cell left gutter as the composer, 3-cell right gutter
 	assert.deepEqual(lines, [
-		"   ┃" + " ".repeat(16),
-		"   ┃  Hello" + " ".repeat(9),
-		"   ┃" + " ".repeat(16),
+		"  ┃" + " ".repeat(17),
+		"  ┃  Hello" + " ".repeat(10),
+		"  ┃" + " ".repeat(17),
 	]);
 });
 
@@ -279,7 +347,7 @@ test("user message block truncates over-wide unbreakable lines", () => {
 			`user-message row exceeds width: ${JSON.stringify(line)}`,
 		);
 	}
-	assert.ok((lines[1] ?? "").startsWith("   ┃  "));
+	assert.ok((lines[1] ?? "").startsWith("  ┃  "));
 });
 
 test("footer never overflows narrow width", () => {
@@ -289,6 +357,7 @@ test("footer never overflows narrow width", () => {
 		contextLabel: "999.9k/999M",
 		gauge: "▰".repeat(13),
 		costLabel: "$9999.99",
+		statuses: [],
 		style: identity,
 		config,
 	});
@@ -298,4 +367,33 @@ test("footer never overflows narrow width", () => {
 			`footer row exceeds width: ${JSON.stringify(line)}`,
 		);
 	}
+});
+
+test("footer drops the context gauge when it does not fit", () => {
+	// narrow terminal: gauge (13) + space + labels exceed the right budget
+	const narrow = composeFooterLines({
+		width: 30,
+		left: "proj:main",
+		contextLabel: "300k/1M",
+		gauge: "▰".repeat(13),
+		costLabel: "$1.56",
+		statuses: [],
+		style: identity,
+		config,
+	});
+	const line = narrow[0] ?? "";
+	assert.ok(!ansiStrip(line).includes("▰"), "gauge hidden on narrow width");
+	assert.ok(ansiStrip(line).includes("300k/1M · $1.56"));
+	// wide terminal: gauge fits alongside the labels
+	const wide = composeFooterLines({
+		width: 80,
+		left: "proj:main",
+		contextLabel: "300k/1M",
+		gauge: "▰".repeat(13),
+		costLabel: "$1.56",
+		statuses: [],
+		style: identity,
+		config,
+	});
+	assert.ok(ansiStrip(wide[0] ?? "").includes("▰"), "gauge kept when it fits");
 });

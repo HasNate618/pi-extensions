@@ -146,8 +146,9 @@ export default function opencodeUi(pi: ExtensionAPI): void {
 		// and stacks a second static row next to the thinking indicator while
 		// a reply streams — hide it (the thinking indicator is separate and
 		// stays).
-		(ctx.ui as { setWorkingVisible?: (visible: boolean) => void })
-			.setWorkingVisible?.(false);
+		(
+			ctx.ui as { setWorkingVisible?: (visible: boolean) => void }
+		).setWorkingVisible?.(false);
 		state = createState(ctx);
 		activeCtx = ctx;
 
@@ -196,7 +197,21 @@ export default function opencodeUi(pi: ExtensionAPI): void {
 					if (activeCtx !== ctx) return;
 					requestRender(ctx);
 				}) ?? null;
-			return new OpencodeFooter(config, ctx.ui.theme, leftLabel, getData);
+			return new OpencodeFooter(
+				config,
+				ctx.ui.theme,
+				leftLabel,
+				getData,
+				// Extension status chips (e.g. prefix-keys' "prefix ⌗" label) are
+				// rendered by the built-in footer but lost in the custom one;
+				// surface them so prefix feedback still shows.
+				() =>
+					(
+						footerData as {
+							getExtensionStatuses?: () => ReadonlyMap<string, string>;
+						}
+					).getExtensionStatuses?.(),
+			);
 		});
 
 		installUserMessagePatch(

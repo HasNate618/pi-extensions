@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
 	DEFAULT_CONFIG,
+	composerBoxMargins,
 	composerMargins,
 	parseConfig,
 } from "../../extensions/opencode-ui/config.ts";
@@ -48,12 +49,36 @@ test("parseConfig clamps margins and spinner interval", () => {
 	assert.equal(config.spinnerIntervalMs, 100);
 });
 
+test("composerBoxMargins defaults the composer left gutter to 2", () => {
+	const m = composerBoxMargins(DEFAULT_CONFIG);
+	assert.equal(m.left, 2);
+	assert.equal(m.right, DEFAULT_CONFIG.chatMargins.right);
+	assert.equal(m.bottom, true);
+	// composer and user-message boxes share the same margins
+	assert.deepEqual(composerMargins(DEFAULT_CONFIG), {
+		left: 2,
+		right: DEFAULT_CONFIG.chatMargins.right,
+		bottom: true,
+	});
+});
+
+test("composerBoxMargins honors an explicit margins override", () => {
+	const cfg = parseConfig({ margins: { left: 1, right: 3, bottom: false } });
+	assert.deepEqual(composerBoxMargins(cfg), {
+		left: 1,
+		right: 3,
+		bottom: false,
+	});
+});
+
 test("chatMargins parses with 0-4 clamp and drives composerMargins fallback", () => {
 	const cfg = parseConfig({ chatMargins: { left: 9, right: -1 } });
 	assert.equal(cfg.chatMargins.left, 4);
 	assert.equal(cfg.chatMargins.right, 0);
+	// the box left gutter defaults to 2 regardless of chatMargins.left;
+	// the right side follows chatMargins.right
 	const m = composerMargins(cfg);
-	assert.equal(m.left, 4);
+	assert.equal(m.left, 2);
 	assert.equal(m.right, 0);
 	assert.equal(m.bottom, true);
 });

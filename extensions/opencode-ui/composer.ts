@@ -7,7 +7,7 @@ import type { TUI } from "@earendil-works/pi-tui";
 import type { EditorTheme } from "@earendil-works/pi-tui/dist/components/editor.ts";
 import { stripEditorFrame } from "./border.ts";
 import type { OpenCodeUiConfig } from "./config.ts";
-import { composerMargins } from "./config.ts";
+import { composerBoxMargins } from "./config.ts";
 import {
 	reapplyBackground,
 	thinkingTokenForLevel,
@@ -15,7 +15,6 @@ import {
 } from "./format.ts";
 import { composeComposerLines, type Styler } from "./layout.ts";
 import { isPrefixArmed } from "./prefix-state.ts";
-
 export type ComposerState = {
 	modelLabel: string;
 	providerLabel: string;
@@ -94,13 +93,8 @@ export class ComposerEditor extends CustomEditor {
 		// Two columns narrower than the box so the editor's own wrap width
 		// (inner - 1, reserving a column for the cursor) equals the composer's
 		// text budget — full lines fit without a spurious ellipsis.
-		const inner = Math.max(
-			0,
-			width -
-				composerMargins(this.config).left -
-				composerMargins(this.config).right -
-				2,
-		);
+		const margins = composerBoxMargins(this.config);
+		const inner = Math.max(0, width - margins.left - margins.right - 2);
 		if (inner <= 4) return super.render(width);
 		const base = super.render(inner);
 		// Pass the editor's own paddingX so the frame strip removes the side

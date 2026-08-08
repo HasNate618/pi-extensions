@@ -23,17 +23,20 @@ export class OpencodeFooter implements Component {
 	private readonly uiTheme: Theme;
 	private readonly leftLabel: () => string;
 	private readonly getData: () => FooterRenderData;
+	private readonly getStatuses: () => ReadonlyMap<string, string> | undefined;
 
 	constructor(
 		config: OpenCodeUiConfig,
 		uiTheme: Theme,
 		leftLabel: () => string,
 		getData: () => FooterRenderData,
+		getStatuses: () => ReadonlyMap<string, string> | undefined,
 	) {
 		this.config = config;
 		this.uiTheme = uiTheme;
 		this.leftLabel = leftLabel;
 		this.getData = getData;
+		this.getStatuses = getStatuses;
 	}
 
 	private styleRole: Styler = (text, role) => {
@@ -66,6 +69,15 @@ export class OpencodeFooter implements Component {
 			data.contextWindow && data.contextWindow > 0
 				? Math.min(100, (tokens / data.contextWindow) * 100)
 				: 0;
+		// Extension status chips (prefix-keys' "prefix ⌗ …" labels), sorted
+		// by key, like pi's built-in footer.
+		const statusMap = this.getStatuses();
+		const statuses =
+			statusMap === undefined
+				? []
+				: Array.from(statusMap.entries())
+						.sort(([a], [b]) => a.localeCompare(b))
+						.map(([, text]) => text);
 		return composeFooterLines({
 			width,
 			left: this.leftLabel(),
@@ -75,6 +87,7 @@ export class OpencodeFooter implements Component {
 			),
 			costLabel: formatCostLabel(data.cost),
 			cacheHitLabel: formatCacheHitRate(data.cacheRead, data.input),
+			statuses,
 			style: this.styleRole,
 			config: this.config,
 		});

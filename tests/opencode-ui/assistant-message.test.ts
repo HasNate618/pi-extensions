@@ -4,8 +4,13 @@ import {
 	insetRenderWidth,
 	insetRenderedLines,
 	insetToolLines,
+	dropLeadingBlankRows,
+	isThinkingOnlyMessage,
 } from "../../extensions/opencode-ui/assistant-layout.ts";
-import { visibleWidth } from "../../extensions/opencode-ui/format.ts";
+import {
+	ansiStrip,
+	visibleWidth,
+} from "../../extensions/opencode-ui/format.ts";
 
 const ZONE_START = "\x1b]133;A\x07";
 const ZONE_END = "\x1b]133;B\x07";
@@ -122,4 +127,63 @@ test("insetToolLines passes kitty image lines through untouched", () => {
 	const image = "\x1b_Gf=1,a=T,t=f,i=1,m=1;AAAA\x1b\\";
 	const out = insetToolLines([image], 66, 2, 2);
 	assert.equal(out[0], image);
+});
+
+test("isThinkingOnlyMessage detects the streaming thinking indicator", () => {
+	assert.equal(
+		isThinkingOnlyMessage([{ type: "thinking", thinking: " hmm " }]),
+		true,
+	);
+	assert.equal(
+		isThinkingOnlyMessage([
+			{ type: "thinking", thinking: "hmm" },
+			{ type: "text", text: "answer" },
+		]),
+		false,
+	);
+	assert.equal(
+		isThinkingOnlyMessage([{ type: "thinking", thinking: "hmm" }]),
+		true,
+	);
+	assert.equal(isThinkingOnlyMessage([]), false);
+	assert.equal(isThinkingOnlyMessage([{ type: "text", text: "hi" }]), false);
+	assert.equal(
+		isThinkingOnlyMessage([
+			{ type: "thinking", thinking: "hmm" },
+			{ type: "toolCall" },
+		]),
+		false,
+	);
+	// empty thinking text renders nothing in pi
+	assert.equal(
+		isThinkingOnlyMessage([{ type: "thinking", thinking: "   " }]),
+		false,
+	);
+});
+
+test("dropLeadingBlankRows removes the spacer stub before the label", () => {
+	// what the inset produces for a thinking-only message (width 20, 3/3):
+	// a blank stub row (left+right spaces + OSC zone) then "Thinking..."
+	const base = [ZONE_START + "      ", "   Thinking..." + " ".repeat(8)];
+	const out = dropLeadingBlankRows(base);
+	assert.equal(out.length, 1);
+	assert.ok((out[0] ?? "").includes("Thinking..."));
+	// non-blank first rows pass through untouched
+	const keep = dropLeadingBlankRows(["   text", "   more"]);
+	assert.deepEqual(keep, ["   text", "   more"]);
+});
+
+test("thinking-only render has no leading blank row", () => {
+	// full pipeline: pi's base render for a thinking-only message, through the
+	// inset, then the thinking-only blank-drop.
+	const base = [
+		ZONE_START + "",
+		ZONE_END + ZONE_FINAL + baseLine(16, "Thinking..."),
+	];
+	const inset = insetRenderedLines(base, 20, 3, 3);
+	assert.equal(inset.length, 2);
+	assert.equal(ansiStrip(inset[0] ?? "").trim(), "");
+	const dropped = dropLeadingBlankRows(inset);
+	assert.equal(dropped.length, 1);
+	assert.ok((dropped[0] ?? "").includes("Thinking..."));
 });

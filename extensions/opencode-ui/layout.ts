@@ -2,6 +2,11 @@ import type { OpenCodeUiConfig } from "./config.ts";
 import { composerBoxMargins, composerMargins } from "./config.ts";
 import { padTo, truncateToWidth, visibleWidth, wrapText } from "./format.ts";
 
+// The context gauge only renders when the footer's content area is at least
+// this wide — on narrower terminals (splits, small windows) it is hidden
+// rather than crammed next to the labels.
+const MIN_GAUGE_CONTENT_WIDTH = 100;
+
 export type Styler = (
 	text: string,
 	role: "rail" | "fill" | "bar" | "model" | "muted" | "thinking" | "text",
@@ -82,10 +87,6 @@ export type FooterLayoutOptions = {
 	gauge: string;
 	costLabel: string;
 	cacheHitLabel: string;
-	// Extension status chips (e.g. prefix-keys' "prefix ⌗ …" labels), sorted
-	// by key — rendered as an extra footer line below the stats, like pi's
-	// built-in footer.
-	statuses: string[];
 	style: Styler;
 	config: OpenCodeUiConfig;
 };
@@ -98,7 +99,6 @@ export function composeFooterLines(options: FooterLayoutOptions): string[] {
 		gauge,
 		costLabel,
 		cacheHitLabel,
-		statuses,
 		style,
 		config,
 	} = options;
@@ -115,11 +115,10 @@ export function composeFooterLines(options: FooterLayoutOptions): string[] {
 		.filter(Boolean)
 		.join("");
 	const rightBudget = Math.max(0, contentWidth - 4);
-	// On narrow terminals the context gauge can't fit alongside the labels;
-	// dropping it beats rendering a partially-truncated gauge.
-	const labelsWidth = visibleWidth(style(rightParts, "muted"));
+	// The context gauge needs a comfortably wide footer: hide it on narrow
+	// terminals (splits, small windows) instead of cramming the row.
 	const gaugeFits =
-		gauge === "" || visibleWidth(gauge) + 1 + labelsWidth <= rightBudget;
+		gauge === "" || contentWidth >= MIN_GAUGE_CONTENT_WIDTH;
 	const rightText = truncateToWidth(
 		(gauge && gaugeFits ? `${gauge} ` : "") + style(rightParts, "muted"),
 		rightBudget,
@@ -143,18 +142,6 @@ export function composeFooterLines(options: FooterLayoutOptions): string[] {
 				]
 			: [" ".repeat(width)];
 	if (composerMargins(config).bottom) rows.push("");
-	if (statuses.length > 0) {
-		// Same shape as pi's built-in footer status line: chips joined with a
-		// space, truncated to the content width with the footer gutters.
-		rows.push(
-			" ".repeat(mLeft) +
-				truncateToWidth(
-					style(statuses.join(" "), "muted"),
-					Math.max(0, contentWidth),
-				) +
-				" ".repeat(Math.max(0, mRight)),
-		);
-	}
 	return rows;
 }
 

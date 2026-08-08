@@ -65,7 +65,10 @@ export function installUserMessagePatch(
 			}
 			const config = configProvider();
 			const margins = composerBoxMargins(config);
-			const contentMax = Math.max(1, width - margins.left - margins.right - 1 - 2);
+			const contentMax = Math.max(
+				1,
+				width - margins.left - margins.right - 1 - 2,
+			);
 			// Render 2 wider so the base box's own 1-char side padding leaves
 			// the markdown wrapped at exactly contentMax.
 			const base =

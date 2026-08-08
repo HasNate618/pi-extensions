@@ -200,55 +200,35 @@ test("composer and user messages share the 2-cell left gutter", () => {
 });
 
 test("footer aligns left and right segments with margins", () => {
+	// gauge shown on a wide footer (contentWidth >= 100)
 	const lines = composeFooterLines({
-		width: 45,
+		width: 130,
 		left: "proj:main",
 		contextLabel: "229k/1M",
 		gauge: "▰▰▰▰▱▱▱▱▱▱▱▱▱",
 		costLabel: "$0.005",
-		statuses: [],
 		style: identity,
 		config,
 	});
 	assert.equal(lines.length, 2);
 	assert.equal(lines[1], "");
 	const line = lines[0] ?? "";
-	assert.ok(line.startsWith("   proj:ma…"));
+	assert.ok(line.startsWith("   proj:main"));
 	assert.ok(line.endsWith("▰▰▰▰▱▱▱▱▱▱▱▱▱ 229k/1M · $0.005   "));
-	assert.equal(line.length, 45);
+	assert.equal(line.length, 130);
 });
 
-test("footer without cost omits it", () => {
+test("footer without cost omits it (gauge hidden on narrow width)", () => {
 	const lines = composeFooterLines({
-		width: 20,
+		width: 60,
 		left: "p:b",
 		contextLabel: "1k/2k",
 		gauge: "▰▱",
 		costLabel: "",
-		statuses: [],
 		style: identity,
 		config,
 	});
-	assert.ok((lines[0] ?? "").endsWith("▰▱ 1k/2k   "));
-});
-
-test("footer renders extension status chips on their own line", () => {
-	const lines = composeFooterLines({
-		width: 45,
-		left: "proj:main",
-		contextLabel: "1k/2k",
-		gauge: "▰▱",
-		costLabel: "",
-		statuses: ["prefix ⌗ (ctrl+x)", "prefix ⌗ m → /model"],
-		style: identity,
-		config,
-	});
-	// stats line + blank row + status line
-	assert.equal(lines.length, 3);
-	assert.ok((lines[2] ?? "").includes("prefix ⌗ (ctrl+x)"));
-	assert.ok((lines[2] ?? "").includes("m → /model"));
-	assert.ok((lines[2] ?? "").startsWith("   prefix ⌗"));
-	for (const line of lines) assert.ok(visibleWidth(line) <= 45);
+	assert.ok((lines[0] ?? "").endsWith("1k/2k   "));
 });
 
 test("footer drops bottom blank row when margins.bottom is false", () => {
@@ -262,7 +242,6 @@ test("footer drops bottom blank row when margins.bottom is false", () => {
 		contextLabel: "1k/2k",
 		gauge: "▰▱",
 		costLabel: "",
-		statuses: [],
 		style: identity,
 		config: noBottom,
 	});
@@ -357,7 +336,6 @@ test("footer never overflows narrow width", () => {
 		contextLabel: "999.9k/999M",
 		gauge: "▰".repeat(13),
 		costLabel: "$9999.99",
-		statuses: [],
 		style: identity,
 		config,
 	});
@@ -369,29 +347,27 @@ test("footer never overflows narrow width", () => {
 	}
 });
 
-test("footer drops the context gauge when it does not fit", () => {
-	// narrow terminal: gauge (13) + space + labels exceed the right budget
+test("footer drops the context gauge below the wide-width threshold", () => {
+	// below the threshold (contentWidth < 100): gauge hidden
 	const narrow = composeFooterLines({
-		width: 30,
+		width: 90,
 		left: "proj:main",
 		contextLabel: "300k/1M",
 		gauge: "▰".repeat(13),
 		costLabel: "$1.56",
-		statuses: [],
 		style: identity,
 		config,
 	});
 	const line = narrow[0] ?? "";
 	assert.ok(!ansiStrip(line).includes("▰"), "gauge hidden on narrow width");
 	assert.ok(ansiStrip(line).includes("300k/1M · $1.56"));
-	// wide terminal: gauge fits alongside the labels
+	// at or above the threshold: gauge kept
 	const wide = composeFooterLines({
-		width: 80,
+		width: 120,
 		left: "proj:main",
 		contextLabel: "300k/1M",
 		gauge: "▰".repeat(13),
 		costLabel: "$1.56",
-		statuses: [],
 		style: identity,
 		config,
 	});

@@ -5,7 +5,7 @@ import { padTo, truncateToWidth, visibleWidth, wrapText } from "./format.ts";
 // The context gauge only renders when the footer's content area is at least
 // this wide — on narrower terminals (splits, small windows) it is hidden
 // rather than crammed next to the labels.
-const MIN_GAUGE_CONTENT_WIDTH = 100;
+const MIN_GAUGE_CONTENT_WIDTH = 60;
 
 export type Styler = (
 	text: string,
@@ -117,8 +117,7 @@ export function composeFooterLines(options: FooterLayoutOptions): string[] {
 	const rightBudget = Math.max(0, contentWidth - 4);
 	// The context gauge needs a comfortably wide footer: hide it on narrow
 	// terminals (splits, small windows) instead of cramming the row.
-	const gaugeFits =
-		gauge === "" || contentWidth >= MIN_GAUGE_CONTENT_WIDTH;
+	const gaugeFits = gauge === "" || contentWidth >= MIN_GAUGE_CONTENT_WIDTH;
 	const rightText = truncateToWidth(
 		(gauge && gaugeFits ? `${gauge} ` : "") + style(rightParts, "muted"),
 		rightBudget,

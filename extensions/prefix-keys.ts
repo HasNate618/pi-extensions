@@ -47,7 +47,7 @@ const STATUS_KEY = "prefix";
 
 const DEFAULT_CONFIG: PrefixConfig = {
 	prefix: "ctrl+x",
-	timeoutMs: 4000,
+	timeoutMs: 3000,
 	bindings: {
 		m: "command:/model",
 		n: "command:/new",

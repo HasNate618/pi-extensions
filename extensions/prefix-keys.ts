@@ -27,7 +27,12 @@
  */
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { matchesKey, parseKey } from "@earendil-works/pi-tui";
+import {
+	isKeyRelease,
+	isKeyRepeat,
+	matchesKey,
+	parseKey,
+} from "@earendil-works/pi-tui";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import type {
 	ExtensionAPI,
@@ -70,11 +75,7 @@ function loadConfig(): PrefixConfig {
 	const path = join(getAgentDir(), CONFIG_FILE);
 	if (!existsSync(path)) {
 		try {
-			writeFileSync(
-				path,
-				`${JSON.stringify(DEFAULT_CONFIG, null, 2)}\n`,
-				"utf8",
-			);
+			writeFileSync(path, `${JSON.stringify(DEFAULT_CONFIG, null, 2)}\n`, "utf8");
 		} catch {
 			// Config is best-effort; defaults still apply.
 		}
@@ -201,6 +202,16 @@ class PrefixState {
 	}
 
 	handle(data: string): { consume?: boolean; data?: string } | undefined {
+		// Kitty protocol (flags 2) emits separate press/repeat/release events.
+		// Only presses should arm or dispatch; releases/repeats must not be
+		// treated as the "next key" or as a bare-modifier disarm. This fixes
+		// the race where releasing ctrl quickly (before or after x) sends
+		// \x1b[...:3u which would otherwise be parsed as "x" (unmapped) or
+		// undefined (bare modifier) and disarm the prefix before the real
+		// follow-up key arrives.
+		if (isKeyRelease(data) || isKeyRepeat(data)) {
+			return this.armed ? { consume: true } : undefined;
+		}
 		if (this.armed) {
 			this.scheduleDisarm();
 			// Repeated prefix key: stay armed, no action.
@@ -301,6 +312,7 @@ export default function (pi: ExtensionAPI) {
 		type SubmitEditor = { onSubmit?: (text: string) => unknown };
 		let lastSubmitEditor: SubmitEditor | undefined;
 		const findSubmitEditor = (): SubmitEditor | undefined => {
+			// SAFETY: pi's TUI keeps focusedComponent internal; we only read onSubmit if present, never write.
 			const focused = (tui as unknown as { focusedComponent?: SubmitEditor })
 				.focusedComponent;
 			if (typeof focused?.onSubmit === "function") {
@@ -384,7 +396,7 @@ export default function (pi: ExtensionAPI) {
 
 	pi.registerCommand("prefix-keys", {
 		description: "Show prefix-keys configuration and armed state",
-		handler: async (args: string[], ctx: ExtensionContext) => {
+		handler: async (_args: string[], ctx: ExtensionContext) => {
 			const config = loadConfig();
 			const prefixLabel = Array.isArray(config.prefix)
 				? config.prefix.join("|")
@@ -469,10 +481,7 @@ function runSelfTest(): void {
 			name: "idle passthrough",
 			run: (h) => {
 				const { state } = h.makeState();
-				h.check(
-					"idle: plain key passes through",
-					state.handle("h") === undefined,
-				);
+				h.check("idle: plain key passes through", state.handle("h") === undefined);
 			},
 		},
 		{
@@ -503,10 +512,7 @@ function runSelfTest(): void {
 					"armed: flash label set",
 					(indicators.at(-1) ?? "").includes("→ /model"),
 				);
-				h.check(
-					"armed: state notified on disarm",
-					armedStates.at(-1) === false,
-				);
+				h.check("armed: state notified on disarm", armedStates.at(-1) === false);
 			},
 		},
 		{
@@ -528,10 +534,7 @@ function runSelfTest(): void {
 				state.handle("\x18");
 				const r = state.handle("\x1b");
 				h.check("armed: escape cancels and consumes", r?.consume === true);
-				h.check(
-					"armed: indicator cleared on cancel",
-					indicators.at(-1) === null,
-				);
+				h.check("armed: indicator cleared on cancel", indicators.at(-1) === null);
 				h.check("armed: state cleared on cancel", armedStates.at(-1) === false);
 			},
 		},

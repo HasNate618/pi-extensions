@@ -309,7 +309,12 @@ export default function (pi: ExtensionAPI) {
 		// onSubmit is the live session submit handler — even for a custom editor
 		// component (pi wires onSubmit onto it). Cache the last editor we saw so
 		// dispatch still works while an overlay/picker briefly holds focus.
-		type SubmitEditor = { onSubmit?: (text: string) => unknown };
+		type SubmitEditor = {
+			onSubmit?: (text: string) => unknown;
+			getText?: () => string;
+			getExpandedText?: () => string;
+			setText?: (text: string) => void;
+		};
 		let lastSubmitEditor: SubmitEditor | undefined;
 		const findSubmitEditor = (): SubmitEditor | undefined => {
 			// SAFETY: pi's TUI keeps focusedComponent internal; we only read onSubmit if present, never write.
@@ -341,7 +346,50 @@ export default function (pi: ExtensionAPI) {
 					pi.sendUserMessage(command, { deliverAs: "followUp" });
 					return;
 				}
-				void Promise.resolve(editor.onSubmit(command)).catch(() => {});
+				// Preserve the current draft (e.g. "hello world" being typed) across
+				// slash-command dispatches like /model. Editor.submitValue() and the
+				// per-command handlers both do setText("") synchronously, which
+				// would otherwise discard the draft. We restore it after the command
+				// settles (covers async pickers like model selector).
+				const getDraft = (): string => {
+					try {
+						const t =
+							editor.getExpandedText?.() ?? editor.getText?.() ?? "";
+						return typeof t === "string" ? t : "";
+					} catch (_e) {
+						// getDraft is best-effort; ignore read errors and treat as empty.
+						void _e;
+						return "";
+					}
+				};
+				const draft = getDraft();
+				const trimmed = draft.trim();
+				const isSlashDraft = trimmed.startsWith("/");
+				// Don't preserve for commands that intentionally start a new context.
+				const noPreserveCommands = new Set(["/new", "/quit", "/clear"]);
+				const shouldPreserve =
+					trimmed.length > 0 &&
+					!isSlashDraft &&
+					trimmed !== command &&
+					!noPreserveCommands.has(command);
+				if (!shouldPreserve) {
+					void Promise.resolve(editor.onSubmit(command)).catch(() => {});
+					return;
+				}
+				const result = editor.onSubmit(command);
+				void Promise.resolve(result)
+					.then(() => {
+						try {
+							const cur = getDraft();
+							if (!cur.trim()) editor.setText?.(draft);
+						} catch (_e) {
+							// Restore is best-effort; ignore if editor was torn down.
+							void _e;
+						}
+					})
+					.catch((_e) => {
+						void _e;
+					});
 			},
 			(armed) =>
 				// Broadcast the armed state on the shared extension event bus so

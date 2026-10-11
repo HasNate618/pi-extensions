@@ -6,40 +6,9 @@ import { composerBoxMargins } from "./config.ts";
 import type { OpenCodeUiConfig } from "./config.ts";
 import { reapplyBackground, stripBaseMessageBox } from "./format.ts";
 import { composeUserMessageBlock, type Styler } from "./layout.ts";
+import { installPrototypePatch } from "./patch.ts";
 
 const RENDER_KEY = "opencode-ui-user-message-render";
-
-type Patchable = { render(width: number): string[]; invalidate(): void };
-
-function installPrototypePatch(
-	prototype: object,
-	key: "render" | "invalidate",
-	patchKey: string,
-	patch: (receiver: Patchable, args: unknown[]) => unknown,
-): () => void {
-	const own = Object.getOwnPropertyDescriptor(prototype, key);
-	if (!own || !("value" in own) || typeof own.value !== "function")
-		return () => {};
-	const previous = own.value;
-	Object.defineProperty(prototype, key, {
-		...own,
-		value(this: Patchable, ...args: unknown[]) {
-			try {
-				return patch(this, args);
-			} catch {
-				return Reflect.apply(previous, this, args);
-			}
-		},
-	});
-	(prototype as Record<string, unknown>)[`__oc_${patchKey}`] = previous;
-	return () => {
-		const saved = (prototype as Record<string, unknown>)[`__oc_${patchKey}`];
-		if (typeof saved === "function") {
-			Object.defineProperty(prototype, key, { ...own, value: saved });
-			delete (prototype as Record<string, unknown>)[`__oc_${patchKey}`];
-		}
-	};
-}
 
 let currentCleanup: (() => void) | null = null;
 
@@ -48,7 +17,12 @@ export function installUserMessagePatch(
 	uiThemeProvider: () => Theme | undefined,
 ): () => void {
 	removeUserMessagePatch();
-	const prototype = UserMessageComponent.prototype as unknown as object;
+	// SAFETY: pi's TUI components are plain prototype-based classes; the patch
+	// slot written by installPrototypePatch is the only state attached.
+	const prototype = UserMessageComponent.prototype as unknown as Record<
+		string,
+		unknown
+	>;
 	const cleanupRender = installPrototypePatch(
 		prototype,
 		"render",

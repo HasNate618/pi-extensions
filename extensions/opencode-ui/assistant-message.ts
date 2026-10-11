@@ -18,7 +18,12 @@ const PATCH_KEY = "opencode-ui-assistant-message-render";
 export function installAssistantMessagePatch(
 	configProvider: () => OpenCodeUiConfig,
 ): () => void {
-	const prototype = AssistantMessageComponent.prototype as unknown as object;
+	// SAFETY: pi's TUI components are plain prototype-based classes; the patch
+	// slot written by installPrototypePatch is the only state attached.
+	const prototype = AssistantMessageComponent.prototype as unknown as Record<
+		string,
+		unknown
+	>;
 	return installPrototypePatch(
 		prototype,
 		"render",

@@ -19,17 +19,18 @@ export function installToolCardPatch(
 	configProvider: () => OpenCodeUiConfig,
 ): () => void {
 	const disposes: Array<() => void> = [];
-	for (const prototype of [ToolExecutionComponent, BashExecutionComponent]) {
+	for (const component of [ToolExecutionComponent, BashExecutionComponent]) {
+		// SAFETY: pi's TUI components are plain prototype-based classes; the
+		// patch slot written by installPrototypePatch is the only state attached.
+		const prototype = component.prototype as unknown as Record<string, unknown>;
 		disposes.push(
 			installPrototypePatch(
-				prototype.prototype as unknown as object,
+				prototype,
 				"render",
 				PATCH_KEY,
 				(receiver, args) => {
 					const width = args[0];
-					const saved = (prototype.prototype as Record<string, unknown>)[
-						`__oc_${PATCH_KEY}`
-					];
+					const saved = prototype[`__oc_${PATCH_KEY}`];
 					if (typeof width !== "number") {
 						return typeof saved === "function"
 							? (saved as (...a: unknown[]) => string[]).call(receiver, ...args)

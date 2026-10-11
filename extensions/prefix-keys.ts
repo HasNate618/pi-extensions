@@ -39,7 +39,7 @@ import type {
 	ExtensionContext,
 	KeybindingsManager,
 } from "@earendil-works/pi-coding-agent";
-import type { InputListener, TUI } from "@earendil-works/pi-tui";
+import type { TUI, TuiInputListener } from "@earendil-works/pi-tui";
 
 interface PrefixConfig {
 	prefix: string | string[];
@@ -353,8 +353,7 @@ export default function (pi: ExtensionAPI) {
 				// settles (covers async pickers like model selector).
 				const getDraft = (): string => {
 					try {
-						const t =
-							editor.getExpandedText?.() ?? editor.getText?.() ?? "";
+						const t = editor.getExpandedText?.() ?? editor.getText?.() ?? "";
 						return typeof t === "string" ? t : "";
 					} catch (_e) {
 						// getDraft is best-effort; ignore read errors and treat as empty.
@@ -400,7 +399,7 @@ export default function (pi: ExtensionAPI) {
 		);
 		activePrefix = state;
 
-		const listener: InputListener = (data) => state.handle(data);
+		const listener: TuiInputListener = (data) => state.handle(data);
 		removeListener = tui.addInputListener(listener);
 	}
 

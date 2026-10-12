@@ -399,8 +399,15 @@ export default function (pi: ExtensionAPI) {
 		);
 		activePrefix = state;
 
+		// Register through the extension UI context rather than straight onto
+		// the captured TUI. pi swaps the TUI object when the user toggles
+		// regular/fullscreen mode (TuiMainScreen vs TuiAltScreen) and re-attaches
+		// only the listeners registered here, via
+		// rebindExtensionTerminalInputListeners(). A listener added directly to a
+		// captured TUI stays on the stopped one and goes dead after the swap —
+		// which is exactly why the prefix key stopped working in regular mode.
 		const listener: TuiInputListener = (data) => state.handle(data);
-		removeListener = tui.addInputListener(listener);
+		removeListener = ctx.ui.onTerminalInput(listener);
 	}
 
 	function warnOnOverriddenBindings(

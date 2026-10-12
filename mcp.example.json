@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "trawl": {
-      "url": "http://trawl.home.lab/mcp",
-      "lifecycle": "lazy"
-    }
-  }
-}

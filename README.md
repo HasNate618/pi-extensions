@@ -1,88 +1,97 @@
 # pi-extensions
 
-Nate's [pi coding agent](https://pi.dev) setup as an installable pi package.
+TUI extensions for the [pi coding agent](https://pi.dev), as an installable pi package.
 
-Provides:
-
-- **`researcher`** — web-research subagent backed by the [trawl](https://trawl.home.lab/mcp) MCP search server (via the `mcp` proxy tool; no direct-tools dependency)
-- **`planner`** — implementation-planning subagent wired to the `superpowers:writing-plans` skill
-- **`prefix-keys`** — tmux-style prefix/leader keybindings for the TUI (see below)
-- **`dashboard`** — full-screen launcher at startup: logo, recent-session picker, new session, quit (see below)
+- **opencode-ui** — restyles pi's TUI to look like opencode's
+- **prefix-keys** — tmux-style prefix/leader keybindings
 
 ## Install
 
 ```bash
 pi install git:github.com/HasNate618/pi-extensions
-pi install npm:pi-mcp-adapter       # MCP proxy tool (required by researcher)
-pi install npm:pi-subagents         # subagent runtime
+# or, from a checkout:
+pi install ./
 ```
 
-Restart pi (or `/reload`).
+Restart pi (or `/reload`). Enabling individual extensions is done in
+`~/.pi/agent/settings.json` by listing them against the package source:
 
-## dashboard (startup launcher)
-
-Replaces pi's startup screen with a centered launcher: the pi logo, recent sessions, quick actions, and a status line. Terminal pane is cleared on open and on quit. If the current directory has no sessions, the dashboard is skipped and pi starts a new session directly.
-
-| Key | Action |
-| --- | --- |
-| `j`/`k` (or arrows) | scroll sessions |
-| `enter` | open selected (default: most recent) |
-| `n` | new session |
-| `/` | filter/search sessions |
-| `q`/`esc` | quit pi |
-
-Reopen anytime with `/dashboard`.
-
-## prefix-keys (prefix keybindings)
-
-Press a configurable prefix (default `ctrl+x`) then a mapped key to run an action — tmux-style. While armed, a `prefix ⌗` chip shows in the footer; the key you then press is consumed and never reaches the editor.
-
-```bash
-# default bindings (config: ~/.pi/agent/prefix-keys.json)
-#   ctrl+x m → /model      ctrl+x t → /tree       ctrl+x T → thinking cycle
-#   ctrl+x n → /new        ctrl+x f → /fork       ctrl+x o → /compact
-#   ctrl+x r → /resume     ctrl+x z → /zentui     ctrl+x c → /copy
+```json
+{
+  "source": "/path/to/pi-extensions",
+  "extensions": ["extensions/opencode-ui.ts", "extensions/prefix-keys.ts"]
+}
 ```
 
-Targets: `command:/name` runs a slash command through the editor's submit path (the same mechanism as typing `/name` + enter — the only public command-dispatch route pi exposes); `key:ctrl+l` injects a keybinding chord (ctrl+letter, plain keys, `shift+tab`, and common specials).
+## opencode-ui
 
-On session start the extension warns about any built-in action your prefix overrides (e.g. `ctrl+x` is `app.message.copy` / `app.models.clearAll` by default) — change the `prefix` in the config if you want those keys back. `escape` cancels an armed prefix; it auto-disarms after `timeoutMs`. Status/`/prefix-keys` command shows the active config.
+Pi's default TUI stretches messages and tool cards across the full terminal
+width. This extension pulls them into a consistent chat gutter and adds the
+opencode furniture:
+
+- `render()` of `AssistantMessageComponent`, `UserMessageComponent`,
+  `ToolExecutionComponent` and `BashExecutionComponent` is wrapped so content
+  draws inside `chatMargins`
+- custom footer via `ctx.ui.setFooter` — cwd, git branch, session name and a
+  context gauge with cache-hit rate
+- spinner throttling so the working indicator updates on a fixed interval
+- user messages get a framed block styled from the active theme
+
+Config lives in `~/.pi/agent/opencode-ui.json` (optional — omitted keys fall
+back to defaults). Useful keys:
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `chatMargins.left` / `.right` | `3` / `3` | transparent gutter size |
+| `spinnerIntervalMs` | `500` | spinner frame interval |
+
+Patches are installed per prototype and removed on shutdown, and every patch
+falls back to pi's original renderer if it throws — a styling bug can never take
+down pi.
+
+## prefix-keys
+
+Press a configurable prefix (default `ctrl+x`), then a mapped key, to run an
+action — tmux-style. While armed a `prefix` chip shows in the footer; the key you
+then press is consumed and never reaches the editor.
+
+```json
+{
+  "prefix": "ctrl+x",
+  "timeoutMs": 4000,
+  "bindings": {
+    "m": "command:/model",
+    "n": "command:/new",
+    "t": "command:/tree",
+    "q": "command:/quit"
+  }
+}
+```
+
+Config: `~/.pi/agent/prefix-keys.json`.
+
+Targets: `command:/name` runs a slash command through the editor's submit path
+(the same mechanism as typing `/name` + enter — the only public command-dispatch
+route pi exposes); `key:ctrl+l` injects a keybinding chord (ctrl+letter, plain
+keys, `shift+tab`, and common specials).
+
+On session start the extension warns about any built-in action your prefix
+overrides (by default `ctrl+x` is `app.message.copy` and
+`app.models.clearAll`) — change `prefix` if you want those keys back. `escape`
+cancels an armed prefix; it auto-disarms after `timeoutMs`. Status and the
+active config are available from the `/prefix-keys` command.
 
 Self-test (no TUI needed): `PREFIX_KEYS_SELFTEST=1 pi -p --no-session "Say OK."`
 
-## Upstream packages used
+## Subagents are not in this repo
 
-```bash
-pi install npm:pi-lens                      # LSP/lint/type feedback
-pi install npm:@juicesharp/rpiv-ask-user-question   # structured questions
-pi install npm:@juicesharp/rpiv-todo        # todo overlay
-```
-
-## Skills (external)
-
-The `planner` agent references `superpowers:writing-plans`. Install the canonical skill set:
-
-```bash
-git clone --depth 1 https://github.com/obra/superpowers.git ~/.pi/agent/skills/superpowers
-```
-
-## MCP: trawl search server
-
-`mcp.example.json` is the config template (home-lab host, no secrets). Install it as your user-global MCP config:
-
-```bash
-cp mcp.example.json ~/.config/mcp/mcp.json
-```
-
-If `pi-mcp-adapter` reports the server, `/mcp status` shows it. Servers are lazy — they connect on first tool use.
-
-## Matugen live theming
-
-`~/.pi/agent/themes/matugen.json` is generated by [matugen](https://github.com/InioX/matugen) on wallpaper change via the skwd-wall integration (`pi` entry in the skwd-wall `config.json`). pi hot-reloads the active theme file on edit, so a running pi recolors instantly. Set `"theme": "matugen"` in `~/.pi/agent/settings.json`. The template lives in the NixOS config repo (`/etc/nixos/home/nate/skwd-theme-configs/templates/pi-theme.json`).
+`pi-subagents` agent definitions (for example the `researcher` and `planner`
+agents) live in pi's user agent directory, `~/.pi/agent/agents/*.md`, because
+they are personal agents rather than extensions.
 
 ## Development
 
-- `extensions/` — pi extension modules (`.ts`, loaded via jiti)
-- `agents/` — pi-subagents agent definitions (`pi.subagents.agents` in `package.json`)
-- Test locally before pushing: `pi install ./` from the repo root
-- Packages load with separate module roots; pi bundles the core `@earendil-works/*` packages (declared as `peerDependencies`)
+- `extensions/` — the two extensions plus `opencode-ui/` helpers
+- `tests/opencode-ui/` — run with `node --test tests/opencode-ui/*.test.ts`
+- `@earendil-works/*` packages are `peerDependencies`; packages load with
+  separate module roots, so pi must supply pi-ai/pi-agent-core/pi-coding-agent/pi-tui

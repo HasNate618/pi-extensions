@@ -1,7 +1,7 @@
 {
   "name": "pi-extensions",
   "version": "0.1.0",
-  "description": "Nate's pi coding agent setup: trawl-backed researcher, writing-plans planner, prefix keybindings",
+  "description": "pi TUI extensions: opencode-style message rendering and tmux-style prefix keybindings",
   "keywords": ["pi-package"],
   "license": "MIT",
   "knip": {
@@ -14,9 +14,6 @@
     "@earendil-works/pi-tui": "*"
   },
   "pi": {
-    "extensions": ["./extensions"],
-    "subagents": {
-      "agents": ["./agents"]
-    }
+    "extensions": ["./extensions"]
   }
 }

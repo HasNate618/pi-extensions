@@ -109,7 +109,12 @@ export function ansiStrip(text: string): string {
 	return (
 		text
 			.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "")
-			.replace(/\x1b\][^\x07]*(?:\x07|\x1b\\)/g, "")
+			// Lazy: a hyperlink is two OSC sequences (open around the URL +
+			// close) with visible label text in between. Greedy matching
+			// backtracks to the last ST and swallows the label too, which
+			// undercounts width, over-pads the row, and crashes pi's TUI
+			// ("Rendered line exceeds terminal width").
+			.replace(/\x1b\][^\x07]*?(?:\x07|\x1b\\)/g, "")
 			// DCS (\x1bP…\x1b\) and APC (\x1b_…\x1b\) or \x1b_…\x07, e.g. pi's
 			// cursor marker \x1b_pi:c\x07) — either ST or BEL terminates.
 			.replace(/\x1b[P_][\s\S]*?(?:\x1b\\|\x07)/g, "")
